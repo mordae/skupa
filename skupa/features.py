@@ -11,33 +11,31 @@ from scipy.spatial.distance import euclidean as distance
 __all__ = ['FeatureTracker', 'Features']
 
 
-# Eyelids are estimated using the angles at the inside and outside corner
-# of the eye. Following constants are maximum and minimum of these two angles
-# added together respectively.
-ANGLE_EYE_OPEN = 95
-ANGLE_EYE_CLOSED = 75
-
-
 class FeatureTracker:
     def __init__(self, index):
         self.index = index
 
         self.gh_mouth = GHFilter(0, 0, 1.0, 0.8, 0.2)
-        self.gh_eyes  = GHFilter(0, 0, 1.0, 0.6, 0.2)
         self.gh_expr  = GHFilter(0, 0, 1.0, 0.6, 0.2)
         self.gh_rpy   = GHFilter(0, 0, 1.0, 0.5, 0.1)
 
+        # Extreme open and closed eye measurements for averages
+        self.eyemin = np.float32([2, 2])
+        self.eyeavg = np.float32([1, 1])
+        self.eyemax = np.float32([0, 0])
+
+        # Open and closed eye history measurements
+        self.eyemina = np.float32([[2] * 30] * 2)
+        self.eyemaxa = np.float32([[0] * 30] * 2)
+
 
     def track(self, lms, rpy, expr):
+        eyes = self._eyes(lms)
+
         # Apply filters to smooth out transitions.
         mouth, _ = self.gh_mouth.update(self._mouth(lms))
-        eyes, _  = self.gh_eyes.update(self._eyes(lms))
         expr, _  = self.gh_expr.update(np.float32(expr))
         rpy, _   = self.gh_rpy.update(rpy)
-
-        # Reduce eyes to just blinking.
-        eyes[eyes > 1.0] = 1.0
-        eyes[eyes < 1.0] = 0.0
 
         # Clip mouth to the 0.0 - 1.0 range.
         mouth[mouth < 0.0] = 0.0
@@ -80,10 +78,38 @@ class FeatureTracker:
         # Horizontal distance
         lh1 = distance(lms[42], lms[45])
 
-        # Ratio
+        # Left eye ratio
         l_eye = (lv1 + lv2) / lh1 * 2.0
 
-        return np.float32([r_eye, l_eye])
+        # Raw eye ratios
+        eyes = np.float32([r_eye, l_eye])
+
+        # Output eye openness coefficients
+        out = np.float32([1.0, 1.0])
+
+        # Update eye limits
+        for i in range(2):
+            if eyes[i] < self.eyemin[i]:
+                self.eyemin[i] = eyes[i]
+            elif eyes[i] > self.eyemax[i]:
+                self.eyemax[i] = eyes[i]
+
+            self.eyeavg[i] = np.average([self.eyemin[i], self.eyemax[i]])
+
+            if eyes[i] >= self.eyeavg[i]:
+                self.eyemaxa[i] = np.roll(self.eyemaxa[i], -1)
+                self.eyemaxa[i][-1] = eyes[i]
+            else:
+                self.eyemina[i] = np.roll(self.eyemina[i], -1)
+                self.eyemina[i][-1] = eyes[i]
+
+            eyemina = np.average(self.eyemina[i]) * 1.1
+            eyemaxa = np.average(self.eyemaxa[i]) * 0.9
+
+            # Interpolate to the 0.0 - 1.0 range
+            out[i] = np.interp(eyes[i], [eyemina, eyemaxa], [0.0, 1.0])
+
+        return out
 
 
     def _mouth(self, lms):
