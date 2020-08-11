@@ -87,8 +87,11 @@ def main(face_detector, landmark_detector, head_model, view, camera, rate, yaw, 
 
     pipe = pipeline(face_detector, landmark_detector, head_model, cam, rate, yaw, latency, protocol, view)
     loop = asyncio.get_event_loop()
-    loop.run_until_complete(pipe)
-    print('Done.')
+
+    try:
+        loop.run_until_complete(pipe)
+    except KeyboardInterrupt:
+        pass
 
 
 async def pipeline(fd, ld, hm, cam, rate, yaw, latency, proto, view):
@@ -186,7 +189,7 @@ async def pipeline(fd, ld, hm, cam, rate, yaw, latency, proto, view):
             if view:
                 cv2.imshow('Debug View', frame)
                 if cv2.waitKey(1) == ord('q'):
-                    asyncio.get_event_loop().stop()
+                    raise KeyboardInterrupt()
 
             if time.time() >= start + 1.0:
                 fps, total = total, 0
