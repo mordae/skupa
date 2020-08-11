@@ -4,7 +4,6 @@
 import math
 import numpy as np
 
-from filterpy.gh import GHFilter
 from scipy.spatial.distance import euclidean as distance
 
 
@@ -15,13 +14,12 @@ class FeatureTracker:
     def __init__(self, index):
         self.index = index
 
-        self.gh_mouth = GHFilter(0, 0, 1.0, 0.8, 0.2)
-        self.gh_expr  = GHFilter(0, 0, 1.0, 0.6, 0.2)
-        self.gh_rpy   = GHFilter(0, 0, 1.0, 0.5, 0.1)
+        # Averages for smoothing.
+        self.avg_expr = np.float32([0, 0, 0, 0, 0, 0])
+        self.avg_rpy  = np.float32([0, 0, 0])
 
         # Extreme open and closed eye measurements for averages
         self.eyemin = np.float32([2, 2])
-        self.eyeavg = np.float32([1, 1])
         self.eyemax = np.float32([0, 0])
 
         # Open and closed eye history measurements
@@ -30,12 +28,11 @@ class FeatureTracker:
 
 
     def track(self, lms, rpy, expr):
-        eyes = self._eyes(lms)
+        self.avg_expr = expr = (self.avg_expr + expr) / 2.
+        self.avg_rpy  = rpy  = (self.avg_rpy  + rpy)  / 2.
 
-        # Apply filters to smooth out transitions.
-        mouth, _ = self.gh_mouth.update(self._mouth(lms))
-        expr, _  = self.gh_expr.update(np.float32(expr))
-        rpy, _   = self.gh_rpy.update(rpy)
+        eyes = self._eyes(lms)
+        mouth = self._mouth(lms)
 
         # Clip mouth to the 0.0 - 1.0 range.
         mouth[mouth < 0.0] = 0.0
@@ -94,9 +91,9 @@ class FeatureTracker:
             elif eyes[i] > self.eyemax[i]:
                 self.eyemax[i] = eyes[i]
 
-            self.eyeavg[i] = np.average([self.eyemin[i], self.eyemax[i]])
+            avg = np.average([self.eyemin[i], self.eyemax[i]])
 
-            if eyes[i] >= self.eyeavg[i]:
+            if eyes[i] >= avg:
                 self.eyemaxa[i] = np.roll(self.eyemaxa[i], -1)
                 self.eyemaxa[i][-1] = eyes[i]
             else:

@@ -1,7 +1,6 @@
 click
 dlib
 eos-py
-filterpy
 numpy
 onnxruntime
 opencv-python
