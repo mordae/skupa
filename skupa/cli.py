@@ -23,7 +23,7 @@ from skupa.features import FeatureTracker
 @click.option('-l', '--landmark-detector', default='dlib',
               help='Landmark detector to use (dlib, onnx)')
 
-@click.option('-h', '--head-model', default='rpy',
+@click.option('-e', '--head-model', default='rpy',
               help='Head model to use (eos, rpy)')
 
 @click.option('-v', '--view/--no-view', default=False,
