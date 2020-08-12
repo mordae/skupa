@@ -29,11 +29,14 @@ from skupa.features import FeatureTracker
 @click.option('-v', '--view/--no-view', default=False,
               help='View diagnostic output')
 
-@click.option('-c', '--camera', type=int, default=0,
+@click.option('-c', '--camera', default=0,
               help='Number of the webcam to use')
 
-@click.option('-r', '--rate', type=int, default=30,
+@click.option('-r', '--rate', default=30,
               help='Maximum frame rate to allow')
+
+@click.option('-n', '--num-faces', default=1,
+              help='Maximum number of faces to process')
 
 @click.option('-y', '--yaw', default=0,
               help='Yaw adjustment (to compensate for camera angle)')
@@ -50,7 +53,8 @@ from skupa.features import FeatureTracker
 @click.option('-P', '--port', type=int, default=9001,
               help='Port to send data to')
 
-def main(face_detector, landmark_detector, head_model, view, camera, rate, yaw, latency, protocol, host, port):
+def main(face_detector, landmark_detector, head_model, view, camera, rate,
+         num_faces, yaw, latency, protocol, host, port):
     assert face_detector in skupa.face.detectors, \
            'Invalid face detector selected'
 
@@ -85,7 +89,9 @@ def main(face_detector, landmark_detector, head_model, view, camera, rate, yaw, 
     # Scale latency to seconds.
     latency /= 1000
 
-    pipe = pipeline(face_detector, landmark_detector, head_model, cam, rate, yaw, latency, protocol, view)
+    pipe = pipeline(face_detector, landmark_detector, head_model, cam, rate,
+                    num_faces, yaw, latency, protocol, view)
+
     loop = asyncio.get_event_loop()
 
     try:
@@ -94,7 +100,7 @@ def main(face_detector, landmark_detector, head_model, view, camera, rate, yaw, 
         pass
 
 
-async def pipeline(fd, ld, hm, cam, rate, yaw, latency, proto, view):
+async def pipeline(fd, ld, hm, cam, rate, num_faces, yaw, latency, proto, view):
     queue = asyncio.Queue()
     trackers = {}
 
@@ -123,12 +129,15 @@ async def pipeline(fd, ld, hm, cam, rate, yaw, latency, proto, view):
 
         while True:
             started, task = await queue.get()
-            faces = await task
+            frame, faces = await task
 
             deadline = previous + latency + 1.0 / rate - 0.005
             previous = started
 
-            for frame, box, vertices, feat in faces:
+            # Sort faces by their boxes (from the left-top).
+            faces = list(sorted(faces, key=lambda f: tuple(f[0])))
+
+            for box, vertices, feat in faces[:num_faces]:
                 # Send the features across the network.
                 proto.send(feat)
 
@@ -232,9 +241,9 @@ async def pipeline(fd, ld, hm, cam, rate, yaw, latency, proto, view):
             # Estimate the features.
             feat = trackers[i].track(lms, rpy, expr)
 
-            results.append((frame, box, vertices, feat))
+            results.append((box, vertices, feat))
 
-        return results
+        return frame, results
 
 
     create_task(publish_frames())

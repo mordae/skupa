@@ -18,13 +18,13 @@ class FeatureTracker:
         self.avg_expr = np.float32([0, 0, 0, 0, 0, 0])
         self.avg_rpy  = np.float32([0, 0, 0])
 
-        # Extreme open and closed eye measurements for averages
-        self.eyemin = np.float32([2, 2])
-        self.eyemax = np.float32([0, 0])
+        # Extreme open and closed eye measurements
+        self.eyemin = np.float32([99, 99])
+        self.eyemax = np.float32([00, 00])
 
-        # Open and closed eye history measurements
-        self.eyemina = np.float32([[2] * 30] * 2)
-        self.eyemaxa = np.float32([[0] * 30] * 2)
+        # Extreme mouth width and height measurements
+        self.mthmin = np.float32([99, 99])
+        self.mthmax = np.float32([00, 00])
 
 
     def track(self, lms, rpy, expr):
@@ -33,10 +33,6 @@ class FeatureTracker:
 
         eyes = self._eyes(lms)
         mouth = self._mouth(lms)
-
-        # Clip mouth to the 0.0 - 1.0 range.
-        mouth[mouth < 0.0] = 0.0
-        mouth[mouth > 1.0] = 1.0
 
         # Allow only one expression at a time.
         largest = max(expr)
@@ -58,62 +54,36 @@ class FeatureTracker:
 
 
     def _eyes(self, lms):
-        # Vertical distance
         rv1 = distance(lms[37], lms[41])
         rv2 = distance(lms[38], lms[40])
 
-        # Horizontal distance
-        rh1 = distance(lms[36], lms[39])
-
-        # Ratio
-        r_eye = (rv1 + rv2) / rh1 * 2.0
-
-        # Vertical distance
         lv1 = distance(lms[43], lms[47])
         lv2 = distance(lms[44], lms[46])
 
-        # Horizontal distance
-        lh1 = distance(lms[42], lms[45])
+        # Raw eye heights
+        eyes = np.float32([(rv1 + rv2) / 2, (lv1 + lv2) / 2])
 
-        # Left eye ratio
-        l_eye = (lv1 + lv2) / lh1 * 2.0
+        # Slowly reset eye extremes
+        self.eyemin += 0.0003
+        self.eyemax -= 0.01
 
-        # Raw eye ratios
-        eyes = np.float32([r_eye, l_eye])
-
-        # Output eye openness coefficients
+        # Output coefficients
         out = np.float32([1.0, 1.0])
 
-        # Update eye limits
         for i in range(2):
             if eyes[i] < self.eyemin[i]:
-                self.eyemin[i] = eyes[i]
-            elif eyes[i] > self.eyemax[i]:
-                self.eyemax[i] = eyes[i]
+                self.eyemin[i] = max(0, eyes[i])
 
-            avg = np.average([self.eyemin[i], self.eyemax[i]])
+            if eyes[i] > self.eyemax[i]:
+                self.eyemax[i] = max(0, eyes[i])
 
-            if eyes[i] >= avg:
-                self.eyemaxa[i] = np.roll(self.eyemaxa[i], -1)
-                self.eyemaxa[i][-1] = eyes[i]
-            else:
-                self.eyemina[i] = np.roll(self.eyemina[i], -1)
-                self.eyemina[i][-1] = eyes[i]
-
-            eyemina = np.average(self.eyemina[i]) * 1.1
-            eyemaxa = np.average(self.eyemaxa[i]) * 0.9
-
-            # Interpolate to the 0.0 - 1.0 range
-            out[i] = np.interp(eyes[i], [eyemina, eyemaxa], [0.0, 1.0])
+            r = [self.eyemin[i], self.eyemax[i]]
+            out[i] = np.interp(eyes[i], r, [0.0, 1.0])
 
         return out
 
 
     def _mouth(self, lms):
-        # Nose horizontal distance as a stable reference distance
-        nh1 = distance((lms[31] + lms[32]) / 2,
-                       (lms[34] + lms[35]) / 2)
-
         # Inside lips vertical distance
         mv1 = distance(lms[61], lms[67])
         mv2 = distance(lms[62], lms[66])
@@ -123,13 +93,27 @@ class FeatureTracker:
         mh1 = distance(lms[60], (lms[57] + lms[51]) / 2)
         mh2 = distance(lms[64], (lms[57] + lms[51]) / 2)
 
-        # Mouth vertical ratio to nose width
-        height = (mv1 + mv2 + mv3) / (nh1 * 3.0) / 1.5
+        # Raw mouth dimensions
+        mth = np.float32([(mh1 + mh2) / 2, (mv1 + mv2 + mv3) / 3])
 
-        # Mouth horizontal ratio to nose width
-        width = (mh1 + mh2) / nh1 - 2.0
+        # Slowly reset mouth extremes
+        self.mthmin += 0.0001
+        self.mthmax -= 0.001
 
-        return np.float32([width, height])
+        # Output mouth coefficients
+        out = np.float32([1.0, 1.0])
+
+        for i in range(2):
+            if mth[i] < self.mthmin[i]:
+                self.mthmin[i] = max(0, mth[i])
+
+            if mth[i] > self.mthmax[i]:
+                self.mthmax[i] = max(0, mth[i])
+
+            r = [self.mthmin[i], self.mthmax[i]]
+            out[i] = np.interp(mth[i], r, [0.0, 1.0])
+
+        return out
 
 
 class Features:
