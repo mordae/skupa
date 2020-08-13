@@ -119,20 +119,36 @@ async def pipeline(fd, ld, hm, cam, rate, num_faces, yaw, latency, proto, view):
 
 
     async def publish_frames():
-        nonlocal latency
-
         fps = 0
         total = 0
         start = time.time()
 
-        previous = 0
+        previous = start
 
         while True:
             started, task = await queue.get()
             frame, faces = await task
 
-            deadline = previous + latency + 1.0 / rate - 0.005
+            deadline = previous + latency + 1. / rate
             previous = started
+
+            if time.time() >= start + 1.:
+                fps, total = total, 0
+                start = time.time()
+            else:
+                total += 1
+
+            finished = time.time()
+
+            if finished - started > latency:
+                ms = int((finished - started) * 1000)
+                print('Dropping frame,', ms, 'ms late.')
+                continue
+
+            idle = deadline - finished
+
+            if idle > 0:
+                await asyncio.sleep(idle)
 
             # Sort faces by their boxes (from the left-top).
             faces = list(sorted(faces, key=lambda f: tuple(f[0])))
@@ -199,24 +215,6 @@ async def pipeline(fd, ld, hm, cam, rate, num_faces, yaw, latency, proto, view):
                 cv2.imshow('Debug View', frame)
                 if cv2.waitKey(1) == ord('q'):
                     raise KeyboardInterrupt()
-
-            if time.time() >= start + 1.0:
-                fps, total = total, 0
-                start = time.time()
-            else:
-                total += 1
-
-            # Smooth out output rate.
-            finished = time.time()
-
-            if finished - started >= latency:
-                latency = finished - started
-                print('Latency is now', int(1000 * latency), 'ms')
-
-            idle = deadline - finished
-
-            if idle > 0:
-                await asyncio.sleep(idle)
 
 
     async def process_frame(frame):
