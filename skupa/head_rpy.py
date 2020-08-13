@@ -41,7 +41,7 @@ class HeadModel:
         pose_mat = cv2.hconcat((rotation_mat, translation_vec))
         _, _, _, _, _, _, (yaw, pitch, roll) = cv2.decomposeProjectionMatrix(pose_mat)
 
-        rpy = np.float32([roll, pitch, yaw])
+        rpy = np.float32([roll[0], pitch[0], yaw[0]])
 
         points = image_pts if vertices else np.float32([])
         return rpy, np.float32([0.] * 6), points
