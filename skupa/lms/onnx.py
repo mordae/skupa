@@ -13,29 +13,43 @@ import onnxruntime as ort
 
 from os.path import join, dirname
 
-from skupa.tracker import Tracker
+from skupa.lms.tracker import Tracker
 from skupa.util import defer
+from skupa.pipe import Worker
 
 
-MODEL_PATH = join(dirname(__file__), 'model',
+MODEL_PATH = join(dirname(__file__), '..', 'model',
                   'lms-160-ainrichman', 'lms-160-slim.onnx')
 
 MODEL_WIDTH  = 160
 MODEL_HEIGHT = 160
 
 
-class LandmarkDetector:
-    WIDTH  = 640
-    HEIGHT = 480
+class LandmarkDetector(Worker):
+    requires = ['frame', 'face']
+    provides = ['lms']
 
-    def __init__(self):
+    def __init__(self, tracking):
+        self.tracking = tracking
+
+    def prepare(self, meta):
+        self.meta = meta
+
+        meta['width']  = max(meta.get('width',  0), 320)
+        meta['height'] = max(meta.get('height', 0), 240)
+
+    async def start(self):
         opts = ort.SessionOptions()
         opts.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
         opts.log_severity_level = 3
 
         self.session = ort.InferenceSession(MODEL_PATH, sess_options=opts)
         self.input_name = self.session.get_inputs()[0].name
-        self.tracker = Tracker()
+
+        if self.tracking:
+            self.tracker = Tracker()
+        else:
+            self.average = np.zeros(68)
 
     def _crop_image(self, orig, box):
         box = box.copy()
@@ -61,8 +75,12 @@ class LandmarkDetector:
 
         return crop_image, ([h, w, box[1], box[0]])
 
-    async def detect(self, image, box):
-        crop_image, detail = self._crop_image(image, box)
+    async def process(self, job):
+        if job.face is None or job.frame is None:
+            job.lms = None
+            return
+
+        crop_image, detail = self._crop_image(job.frame, job.face)
         crop_image = (crop_image - 127.0) / 127.0
         crop_image = np.float32([np.transpose(crop_image, (2, 0, 1))])
 
@@ -72,10 +90,15 @@ class LandmarkDetector:
         lms[:, 0] = lms[:, 0] * detail[1] + detail[3]
         lms[:, 1] = lms[:, 1] * detail[0] + detail[2]
 
-        try:
-            return self.tracker.track(image, lms)
-        except:
-            return lms
+        if self.tracking:
+            job.lms = self.tracker.track(job.frame, lms)
+
+        else:
+            if not self.average.any():
+                self.average = lms
+
+            self.average = self.average * 0.5 + lms * 0.5
+            job.lms = self.average[:]
 
 
 # vim:set sw=4 ts=4 et:

@@ -9,6 +9,7 @@
 
 from os.path import join, dirname
 from skupa.util import defer
+from skupa.pipe import Worker
 
 import cv2
 import numpy as np
@@ -18,10 +19,10 @@ import onnxruntime as ort
 __all__ = ['FaceDetector']
 
 
-MAIN_MODEL_PATH = join(dirname(__file__), 'model',
+MAIN_MODEL_PATH = join(dirname(__file__), '..', 'model',
                        'face-320-linzaer', 'face-320-RFB.onnx')
 
-SLIM_MODEL_PATH = join(dirname(__file__), 'model',
+SLIM_MODEL_PATH = join(dirname(__file__), '..', 'model',
                        'face-320-linzaer', 'face-320-slim.onnx')
 
 MODEL_WIDTH  = 320
@@ -67,22 +68,76 @@ def hard_nms(box_scores, iou_threshold, top_k=-1, candidate_size=200):
     return box_scores[picked, :]
 
 
-class FaceDetector:
-    WIDTH = 640
-    HEIGHT = 480
+class FaceDetector(Worker):
+    requires = ['frame']
+    provides = ['face']
 
-    def __init__(self, model='slim'):
+    def __init__(self, slim):
+        self.slim = slim
+
+
+    def prepare(self, meta):
+        self.meta = meta
+
+        meta['width']  = max(meta.get('width',  0), MODEL_WIDTH)
+        meta['height'] = max(meta.get('height', 0), MODEL_HEIGHT)
+
+
+    async def start(self):
         opts = ort.SessionOptions()
         opts.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
         opts.log_severity_level = 3
 
-        if model == 'slim':
+        if self.slim:
             model_path = SLIM_MODEL_PATH
         else:
             model_path = MAIN_MODEL_PATH
 
         self.session = ort.InferenceSession(model_path, sess_options=opts)
         self.input_name = self.session.get_inputs()[0].name
+
+        self.average = np.zeros(4)
+
+
+    async def process(self, job):
+        if job.frame is None:
+            job.face = None
+            return
+
+        image = cv2.cvtColor(job.frame, cv2.COLOR_BGR2RGB)
+        image = cv2.resize(image, (MODEL_WIDTH, MODEL_HEIGHT))
+        image_mean = np.array([127, 127, 127])
+        image = (image - image_mean) / 128
+        image = np.transpose(image, [2, 0, 1])
+        image = np.expand_dims(image, axis=0)
+        image = np.float32(image)
+
+        conf, boxes = await defer(self.session.run, None, {self.input_name: image})
+        boxes, probs = self._predict(conf, boxes, 0.8)
+
+        h, w, _ = job.frame.shape
+
+        if len(boxes) > 0:
+            boxes[:, 0] *= w
+            boxes[:, 1] *= h
+            boxes[:, 2] *= w
+            boxes[:, 3] *= h
+
+        # Order faces from left.
+        boxes = list(sorted(boxes, key=lambda b: b[0]))
+
+        # TODO: Maybe return the middle one?
+
+        if len(boxes) > 0:
+            if not self.average.any():
+                self.average = boxes[0]
+            else:
+                self.average = self.average * 0.8 + boxes[0] * 0.2
+
+            job.face = np.int32(self.average)
+
+        else:
+            job.face = None
 
 
     def _predict(self, confidences, boxes, prob_threshold, iou_threshold=0.3, top_k=-1):
@@ -109,38 +164,7 @@ class FaceDetector:
             return np.int32([]), np.array([])
 
         picked_box_probs = np.concatenate(picked_box_probs)
-        picked_box_probs[:, 0] *= self.WIDTH
-        picked_box_probs[:, 1] *= self.HEIGHT
-        picked_box_probs[:, 2] *= self.WIDTH
-        picked_box_probs[:, 3] *= self.HEIGHT
-
         return picked_box_probs[:, :4], picked_box_probs[:, 4]
-
-
-    async def detect(self, orig_image):
-        image = cv2.cvtColor(orig_image, cv2.COLOR_BGR2RGB)
-        image = cv2.resize(image, (MODEL_WIDTH, MODEL_HEIGHT))
-        image_mean = np.array([127, 127, 127])
-        image = (image - image_mean) / 128
-        image = np.transpose(image, [2, 0, 1])
-        image = np.expand_dims(image, axis=0)
-        image = np.float32(image)
-
-        conf, boxes = await defer(self.session.run, None, {self.input_name: image})
-        boxes, probs = self._predict(conf, boxes, 0.8)
-
-        h, w, _ = orig_image.shape
-
-        if len(boxes) > 0:
-            boxes[:, 0] *= w / self.WIDTH
-            boxes[:, 1] *= h / self.HEIGHT
-            boxes[:, 2] *= w / self.WIDTH
-            boxes[:, 3] *= h / self.HEIGHT
-
-        # Order faces from left.
-        boxes = list(sorted(boxes, key=lambda b: b[0]))
-
-        return np.int32(boxes), probs
 
 
 # vim:set sw=4 ts=4 et:

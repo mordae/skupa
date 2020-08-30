@@ -1,8 +1,8 @@
 click
 dlib
-eos-py
 numpy
 onnxruntime
 opencv-python
 oscpy
+pyaudio
 scipy
