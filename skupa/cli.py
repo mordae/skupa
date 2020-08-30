@@ -66,6 +66,16 @@ def auto_eyes(interval):
     return EyesTracker(interval)
 
 
+@main.command('headband', help='Headbandroll/pitch/yaw reader')
+@click.option('-d', '--device', default='/dev/ttyUSB0', help='Serial port')
+@click.option('-r', '--roll', default=0, help='Roll correction')
+@click.option('-p', '--pitch', default=0, help='Pitch correction')
+@click.option('-y', '--yaw', default=0, help='Yaw correction')
+def headband(**kw):
+    from skupa.head.headband import HeadPoseReader
+    return HeadPoseReader(**kw)
+
+
 @main.command('audio-mouth', help='Audio-based mouth tracking')
 @click.option('-l', '--language', default='cs', help='Language model to use')
 def audio_mouth(language):
@@ -105,7 +115,8 @@ def preview(**kw):
 @main.resultcallback()
 def run_pipeline(workers, rate):
     from skupa.pipe import Pipeline
-    from asyncio import run
+    from concurrent.futures import ThreadPoolExecutor
+    from asyncio import run, get_running_loop
 
     meta = {}
     pipe = Pipeline(meta)
@@ -114,6 +125,9 @@ def run_pipeline(workers, rate):
         pipe.add_worker(worker)
 
     async def amain():
+        loop = get_running_loop()
+        loop.set_default_executor(ThreadPoolExecutor(32))
+
         await pipe.start()
         async for job in pipe.run(rate):
             # TODO: Maybe track latency?

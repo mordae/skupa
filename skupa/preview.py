@@ -38,7 +38,9 @@ class Preview(Worker):
 
     async def process(self, job):
         if getattr(job, 'frame', None) is None:
-            return
+            shape = (self.meta['height'], self.meta['width'], 3)
+            job.frame = np.ones(shape=shape, dtype=np.uint8)
+            job.frame *= 255
 
         h, w, _ = job.frame.shape
 
