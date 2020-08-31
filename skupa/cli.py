@@ -118,6 +118,11 @@ def run_pipeline(workers, rate):
     from concurrent.futures import ThreadPoolExecutor
     from asyncio import run, get_running_loop
 
+    if not workers:
+        print('No workers configured.')
+        print("Run `skupa --help' to get a list.")
+        return
+
     meta = {}
     pipe = Pipeline(meta)
 
