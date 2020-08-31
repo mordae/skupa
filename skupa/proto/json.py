@@ -29,13 +29,13 @@ class JSONProtocol(Worker):
         data = {'index': self.index}
 
         if getattr(job, 'rpy', None) is not None:
-            data['rpy'] = [round(x, 5) for x in job.rpy]
+            data['rpy'] = [round(float(x), 5) for x in job.rpy]
 
         if getattr(job, 'eyes', None) is not None:
-            data['eyes'] = [round(x, 5) for x in job.eyes]
+            data['eyes'] = [round(float(x), 5) for x in job.eyes]
 
         if getattr(job, 'mouth', None) is not None:
-            data['mouth'] = [round(x, 5) for x in job.mouth]
+            data['mouth'] = [round(float(x), 5) for x in job.mouth]
 
         bstr = json.dumps(data).encode('utf8')
         self.socket.sendto(bstr, (self.host, self.port))
