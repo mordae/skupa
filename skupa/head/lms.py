@@ -4,6 +4,8 @@
 import cv2
 import numpy as np
 
+from scipy.stats import circmean
+
 from skupa.pipe import Worker
 
 
@@ -26,8 +28,12 @@ class HeadPoseEstimator(Worker):
     requires = ['frame', 'lms']
     provides = ['rpy']
 
+    def __init__(self, roll, pitch, yaw):
+        self.correction = np.array([roll, pitch, yaw])
+
     async def start(self):
-        self.average = np.zeros(3)
+        # In radians for easier averaging.
+        self.rpy = np.zeros(3)
 
     async def process(self, job):
         if job.lms is None or job.frame is None:
@@ -50,13 +56,13 @@ class HeadPoseEstimator(Worker):
         pose_mat = cv2.hconcat((rotation_mat, translation_vec))
         _, _, _, _, _, _, (pitch, yaw, roll) = cv2.decomposeProjectionMatrix(pose_mat)
 
-        rpy = np.array([roll[0], pitch[0], yaw[0]])
+        rpy = np.radians([roll[0], pitch[0], yaw[0]])
 
-        if not self.average.any():
-            self.average = rpy
+        for i in range(3):
+            self.rpy[i] = circmean([self.rpy[i]] * 4 + [rpy[i]] * 1)
 
-        self.average = self.average * 0.5 + rpy * 0.5
-        job.rpy = self.average
+        job.rpy = np.degrees(self.rpy)
+        job.rpy[job.rpy > 180] -= 360
 
 
 # vim:set sw=4 ts=4 et:

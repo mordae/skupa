@@ -48,9 +48,12 @@ def onnx_lms(tracking):
 
 
 @main.command('lms-rpy', help='Landmark-based roll/pitch/yaw estimator')
-def lms_face_pose():
+@click.option('-r', '--roll', default=0, help='Roll correction')
+@click.option('-p', '--pitch', default=0, help='Pitch correction')
+@click.option('-y', '--yaw', default=0, help='Yaw correction')
+def lms_face_pose(**kw):
     from skupa.head.lms import HeadPoseEstimator
-    return HeadPoseEstimator()
+    return HeadPoseEstimator(**kw)
 
 
 @main.command('lms-eyes', help='Landmark-based eye tracking')
