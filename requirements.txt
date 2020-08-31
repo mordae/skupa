@@ -1,9 +1,1 @@
-click
-dlib
-numpy
-onnxruntime
-opencv-python
-oscpy
-pyaudio
-pyserial
-scipy
+-e .
