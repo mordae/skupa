@@ -44,6 +44,10 @@ class Preview(Worker):
 
         h, w, _ = job.frame.shape
 
+        if getattr(job, 'frame_rate', None) is not None:
+            cv2.putText(job.frame, '%3.1f' % job.frame_rate, (w - 40, 10),
+                        FONT, 0.4, BLACK)
+
         if self.face and getattr(job, 'face', None) is not None:
             cv2.rectangle(job.frame,
                           tuple(job.face[:2]), tuple(job.face[2:]),
