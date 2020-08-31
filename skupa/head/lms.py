@@ -61,7 +61,7 @@ class HeadPoseEstimator(Worker):
         for i in range(3):
             self.rpy[i] = circmean([self.rpy[i]] * 4 + [rpy[i]] * 1)
 
-        job.rpy = np.degrees(self.rpy)
+        job.rpy = np.degrees(self.rpy) + self.correction
         job.rpy[job.rpy > 180] -= 360
 
 
