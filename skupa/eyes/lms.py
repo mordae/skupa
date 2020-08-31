@@ -15,8 +15,8 @@ class EyesTracker(Worker):
     requires = ['lms']
     provides = ['eyes']
 
-    def __init__(self):
-        pass
+    def __init__(self, raw):
+        self.raw = raw
 
     async def start(self):
         # Extreme open and closed eye measurements
@@ -44,7 +44,7 @@ class EyesTracker(Worker):
         self.eyemax -= 0.01
 
         # Output coefficients
-        job.eyes = np.float32([1., 1.])
+        out = np.float32([1., 1.])
 
         for i in range(2):
             if eyes[i] < self.eyemin[i]:
@@ -54,7 +54,15 @@ class EyesTracker(Worker):
                 self.eyemax[i] = max(0, eyes[i])
 
             r = [self.eyemin[i], self.eyemax[i]]
-            job.eyes[i] = np.interp(eyes[i], r, [0., 1.])
+            out[i] = np.interp(eyes[i], r, [0., 1.])
+
+        if self.raw:
+            job.eyes = out
+        else:
+            if np.mean(out) > 0.5:
+                job.eyes = np.array([1., 1.])
+            else:
+                job.eyes = np.array([0., 0.])
 
 
 # vim:set sw=4 ts=4 et:

@@ -57,9 +57,10 @@ def lms_face_pose(**kw):
 
 
 @main.command('lms-eyes', help='Landmark-based eye tracking')
-def lms_eyes():
+@click.option('--raw/--no-raw', default=False, help='Emit raw eye openness levels')
+def lms_eyes(**kw):
     from skupa.eyes.lms import EyesTracker
-    return EyesTracker()
+    return EyesTracker(**kw)
 
 
 @main.command('auto-eyes', help='Time-based automatic blinking')
