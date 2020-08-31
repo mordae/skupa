@@ -41,7 +41,7 @@ NOISE_RATIO = .001
 
 # How quickly do vowels decay.
 # That is, how quickly does the mouth close after each sound.
-VOWEL_DECAY_RATE = 0.5
+VOWEL_DECAY_RATE = 0.8
 
 
 class AudioMouthTracker(Worker):
@@ -86,6 +86,9 @@ class AudioMouthTracker(Worker):
         # Start really high and drop to make sure we start filtering quickly.
         self.noise_floor = 0.
 
+        # Most recent volume.
+        self.volume = 0.
+
     async def _read_frames(self):
         while True:
             frame = await defer(self.stream.read, SAMPLE_SIZE)
@@ -97,7 +100,7 @@ class AudioMouthTracker(Worker):
             frame = self.frames.pop(0)
 
             window = blackman(len(frame))
-            volume = 20. * np.log10(np.max(np.abs(frame)) / 32768)
+            self.volume = 20. * np.log10(np.max(np.abs(frame)) / 32768)
 
             freqs, densities = welch(frame, RATE, nperseg=len(frame))
             freqs = freqs[:CUTOFF]
@@ -114,8 +117,8 @@ class AudioMouthTracker(Worker):
             if np.abs(np.max(self.noise)) > 30:
                 self.noise *= 0.
 
-            if volume < self.noise_floor + NOISE_BAND:
-                self.noise_floor = self.noise_floor * 0.99 + volume * 0.01
+            if self.volume < self.noise_floor + NOISE_BAND:
+                self.noise_floor = self.noise_floor * 0.99 + self.volume * 0.01
                 self.noise = self.noise * (1. - NOISE_RATIO) \
                            + densities  * NOISE_RATIO
 
@@ -125,9 +128,9 @@ class AudioMouthTracker(Worker):
             # Decay weights over time.
             self.vowels *= VOWEL_DECAY_RATE
 
-            if volume > self.noise_floor + 6 * NOISE_BAND:
+            if self.volume > self.noise_floor + 6 * NOISE_BAND:
                 # Identify the vowel (or silence).
-                inputs = [*densities, *self.prev, volume]
+                inputs = [*densities, *self.prev, self.volume]
                 res = await defer(self.session.run,
                                   [self.output_name],
                                   {self.input_name: [inputs]})
@@ -148,13 +151,13 @@ class AudioMouthTracker(Worker):
             # Smooth out densities over time.
             self.prev = self.prev * 0.5 + densities * 0.5
 
-            # Present the output.
-            job.mouth = self.vowels[:5]
+        # Present the output.
+        job.mouth = self.vowels[:5]
 
-            # Also include some misc information.
-            job.audio_volume      = volume
-            job.audio_noise_floor = self.noise_floor
-            job.audio_denoise     = np.max(self.noise)
+        # Also include some misc information.
+        job.audio_volume      = self.volume
+        job.audio_noise_floor = self.noise_floor
+        job.audio_denoise     = np.max(self.noise)
 
 
 # vim:set sw=4 ts=4 et:
