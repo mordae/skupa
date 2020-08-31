@@ -33,6 +33,10 @@ class FaceDetector(Worker):
         self.detector = dlib.get_frontal_face_detector()
 
     async def process(self, job):
+        if job.frame is None:
+            job.face = None
+            return
+
         # DLib operates on grayscale images.
         gray = cv2.cvtColor(job.frame, cv2.COLOR_BGR2GRAY)
 
