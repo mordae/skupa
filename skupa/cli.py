@@ -18,6 +18,13 @@ def camera(device):
     return CameraFeed(device)
 
 
+@main.command('video-file', help='OpenCV-based video file input')
+@click.option('-f', '--path', help='File path')
+def camera(path):
+    from skupa.video.videofile import VideoFeed
+    return VideoFeed(path)
+
+
 @main.command('dlib-face', help='DLib-based face detector')
 def dlib_face():
     from skupa.face.dlib import FaceDetector
