@@ -18,6 +18,7 @@ class Pipeline:
 
     def add_worker(self, worker):
         self.workers.append(worker)
+        worker.set_pipeline(self)
 
 
     async def start(self):
@@ -38,6 +39,11 @@ class Pipeline:
 
         for worker in self.workers:
             await worker.start()
+
+
+    def reset(self, hint=None):
+        for worker in self.workers:
+            worker.reset(hint)
 
 
     async def run(self, rate):
@@ -65,8 +71,17 @@ class Worker:
     provides = []
     after    = []
 
+    def __init__(self):
+        self.pipeline = None
+
     def prepare(self, meta):
         self.meta = meta
+
+    def set_pipeline(self, pipeline):
+        self.pipeline = pipeline
+
+    def reset(self, hint=None):
+        pass
 
     async def start(self):
         pass

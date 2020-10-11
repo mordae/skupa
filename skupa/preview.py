@@ -91,8 +91,13 @@ class Preview(Worker):
                             (20, h - 45), FONT, 0.4, BLACK)
 
         cv2.imshow('Skupa Preview', job.frame)
-        if cv2.waitKey(1) == ord('q'):
+        key = cv2.waitKey(1)
+
+        if key == ord('q'):
             os._exit(0)
+        elif key == ord('r'):
+            print('Resetting rpy')
+            self.pipeline.reset('rpy')
 
 
 # vim:set sw=4 ts=4 et:

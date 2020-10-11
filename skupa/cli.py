@@ -48,9 +48,6 @@ def onnx_lms(tracking):
 
 
 @main.command('lms-rpy', help='Landmark-based roll/pitch/yaw estimator')
-@click.option('-r', '--roll', default=0, help='Roll correction')
-@click.option('-p', '--pitch', default=0, help='Pitch correction')
-@click.option('-y', '--yaw', default=0, help='Yaw correction')
 def lms_face_pose(**kw):
     from skupa.head.lms import HeadPoseEstimator
     return HeadPoseEstimator(**kw)
@@ -72,9 +69,6 @@ def auto_eyes(interval):
 
 @main.command('headband', help='Headbandroll/pitch/yaw reader')
 @click.option('-d', '--device', default='/dev/ttyUSB0', help='Serial port')
-@click.option('-r', '--roll', default=0, help='Roll correction')
-@click.option('-p', '--pitch', default=0, help='Pitch correction')
-@click.option('-y', '--yaw', default=0, help='Yaw correction')
 def headband(**kw):
     from skupa.head.headband import HeadPoseReader
     return HeadPoseReader(**kw)

@@ -5,6 +5,7 @@ import cv2
 import numpy as np
 
 from scipy.stats import circmean
+from scipy.spatial.transform import Rotation
 
 from skupa.pipe import Worker
 
@@ -28,12 +29,18 @@ class HeadPoseEstimator(Worker):
     requires = ['frame', 'lms']
     provides = ['rpy']
 
-    def __init__(self, roll, pitch, yaw):
-        self.correction = np.array([roll, pitch, yaw])
+    def __init__(self):
+        self.correction = Rotation.from_euler('xyz', [0, 0, 0])
 
     async def start(self):
         # In radians for easier averaging.
         self.rpy = np.zeros(3)
+
+    def reset(self, hint=None):
+        if hint != 'rpy':
+            return
+
+        self.correction = Rotation.from_euler('xyz', self.rpy).inv()
 
     async def process(self, job):
         if job.lms is None or job.frame is None:
@@ -61,8 +68,8 @@ class HeadPoseEstimator(Worker):
         for i in range(3):
             self.rpy[i] = circmean([self.rpy[i]] * 4 + [rpy[i]] * 1)
 
-        job.rpy = np.degrees(self.rpy) + self.correction
-        job.rpy[job.rpy > 180] -= 360
+        rot = Rotation.from_euler('xyz', self.rpy) * self.correction
+        job.rpy = rot.as_euler('xyz', degrees=True)
 
 
 # vim:set sw=4 ts=4 et:
