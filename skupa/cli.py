@@ -18,11 +18,11 @@ def camera(device):
     return CameraFeed(device)
 
 
-@main.command('video-file', help='OpenCV-based video file input')
+@main.command('playback', help='GStreamer-based audio/video playback')
 @click.option('-f', '--path', help='File path')
-def camera(path):
-    from skupa.video.videofile import VideoFeed
-    return VideoFeed(path)
+def playback(path):
+    from skupa.video.playback import PlaybackFeed
+    return PlaybackFeed(path)
 
 
 @main.command('dlib-face', help='DLib-based face detector')
