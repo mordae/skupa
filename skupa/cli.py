@@ -6,7 +6,6 @@ import os
 
 
 @click.group(chain=True, invoke_without_command=True)
-@click.option('-r', '--rate', default=30, help='Output rate limit')
 def main(**kw):
     pass
 
@@ -118,7 +117,7 @@ def preview(**kw):
 
 
 @main.resultcallback()
-def run_pipeline(workers, rate):
+def run_pipeline(workers):
     from skupa.pipe import Pipeline
     from concurrent.futures import ThreadPoolExecutor
     from asyncio import run, get_running_loop
@@ -139,7 +138,7 @@ def run_pipeline(workers, rate):
         loop.set_default_executor(ThreadPoolExecutor(32))
 
         await pipe.start()
-        async for job in pipe.run(rate):
+        async for job in pipe.run():
             # TODO: Maybe track latency?
             pass
 

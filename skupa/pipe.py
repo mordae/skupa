@@ -46,24 +46,31 @@ class Pipeline:
             worker.reset(hint)
 
 
-    async def run(self, rate):
+    async def run(self):
+        queue = []
+        job = None
+
         while True:
-            yield self.tick()
-            await asyncio.sleep(1 / rate)
+            while len(queue) >= 60:
+                old = queue.pop(0)
+                await old.done()
+                old.dispose()
 
+            self.clock += 1
+            job = Job(self.clock, job, self.meta)
 
-    def tick(self):
-        self.clock += 1
-        job = Job(self.clock, self.meta)
+            for worker in self.workers:
+                task = asyncio.create_task(worker._handle(job))
+                job._tasks.append(task)
 
-        for worker in self.workers:
-            task = asyncio.create_task(worker._handle(job))
-            job._tasks.append(task)
+                for prov in worker.provides:
+                    job._deps[prov] = task
 
-            for prov in worker.provides:
-                job._deps[prov] = task
+            # Watch the last worker so that we know when the
+            # job is finished and can start another one.
+            queue.append(job)
 
-        return job
+            yield job
 
 
 class Worker:
@@ -101,10 +108,11 @@ class Worker:
 
 
 class Job:
-    def __init__(self, tick, meta):
+    def __init__(self, tick, prev, meta):
         self.id = tick
         self.ts = time.time()
 
+        self.prev = prev
         self.meta = meta
 
         self._tasks = []
@@ -118,6 +126,11 @@ class Job:
 
     def __repr__(self):
         return 'Job(id={})'.format(self.id)
+
+    def dispose(self):
+        self.prev = None
+        self._tasks = None
+        self._deps = None
 
 
 def solve_pipeline(workers):
