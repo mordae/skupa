@@ -19,7 +19,7 @@ def camera(device):
 
 
 @main.command('playback', help='GStreamer-based audio/video playback')
-@click.option('-f', '--path', help='File path')
+@click.option('-f', '--path', help='File path', required=True)
 def playback(path):
     from skupa.video.playback import PlaybackFeed
     return PlaybackFeed(path)

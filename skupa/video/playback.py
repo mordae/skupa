@@ -55,7 +55,7 @@ class PlaybackFeed(Worker):
 
         if sample is None:
             print('No more video frames, exiting...')
-            os._exit()
+            os._exit(0)
 
         caps = sample.get_caps()
         structure = caps.get_structure(0)
@@ -63,7 +63,7 @@ class PlaybackFeed(Worker):
         ok, num, denom = structure.get_fraction('framerate')
         if not ok:
             print('Failed to determine video frame rate, exiting...')
-            os._exit()
+            os._exit(1)
 
         job.frame_rate = num / denom
 
@@ -73,7 +73,7 @@ class PlaybackFeed(Worker):
         fmt = structure.get_string('format')
         if fmt != 'RGB':
             print('Failed to get RGB frame from the video, exiting...')
-            os._exit()
+            os._exit(1)
 
         buf = sample.get_buffer()
         data = buf.extract_dup(0, buf.get_size())
