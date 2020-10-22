@@ -29,7 +29,7 @@ class PlaybackFeed(Worker):
         self.path = path
 
     async def start(self):
-        self.pipeline = Gst.ElementFactory.make('playbin3', 'playbin3')
+        self.pipeline = Gst.ElementFactory.make('playbin3')
 
         if '://' in self.path:
             self.pipeline.set_property('uri', self.path)
@@ -44,8 +44,28 @@ class PlaybackFeed(Worker):
         self.videosink.set_property('caps', videocaps)
         self.pipeline.set_property('video-sink', self.videosink)
 
-        self.audiosink = Gst.ElementFactory.make('fakeaudio', 'fakeaudio')
-        self.pipeline.set_property('audio-sink', self.audiosink)
+        tee = Gst.ElementFactory.make('tee')
+
+        audioconvert1 = Gst.ElementFactory.make('audioconvert')
+        tee.link(audioconvert1)
+
+        autoaudiosink = Gst.ElementFactory.make('autoaudiosink')
+        audioconvert1.link(autoaudiosink)
+
+        audioconvert2 = Gst.ElementFactory.make('audioconvert')
+        tee.link(audioconvert2)
+
+        audiocaps = Gst.Caps.new_empty_simple('audio/x-raw')
+        audiocaps.set_value('format', 'S16LE')
+        audiocaps.set_value('channels', 1)
+        audiocaps.set_value('rate', 44100)
+
+        self.audiosink = GstApp.AppSink()
+        self.audiosink.set_max_buffers(60)
+        self.audiosink.set_property('caps', audiocaps)
+        audioconvert2.link(self.audiosink)
+
+        self.pipeline.set_property('audio-sink', tee)
 
         self.pipeline.set_state(Gst.State.PLAYING)
 
