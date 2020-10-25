@@ -4,6 +4,7 @@
 import cv2
 import numpy as np
 import os
+import time
 
 from skupa.pipe import Worker
 
@@ -30,23 +31,22 @@ class Preview(Worker):
         self.eyes  = eyes
         self.mouth = mouth
 
-    def prepare(self, meta):
-        self.meta = meta
-
-        meta['width']  = max(meta.get('width',  0), PREVIEW_WIDTH)
-        meta['height'] = max(meta.get('height', 0), PREVIEW_HEIGHT)
+        self.latency = 0
 
     async def process(self, job):
-        if getattr(job, 'frame', None) is None:
-            shape = (self.meta['height'], self.meta['width'], 3)
-            job.frame = np.ones(shape=shape, dtype=np.uint8)
-            job.frame *= 255
-
-        h, w, _ = job.frame.shape
+        h, w = job.frame.shape[:2]
 
         if getattr(job, 'frame_rate', None) is not None:
-            cv2.putText(job.frame, '%3.1f' % job.frame_rate, (w - 40, 10),
+            cv2.putText(job.frame, '%3.1f fps' % job.frame_rate, (w - 60, 10),
                         FONT, 0.4, BLACK)
+
+        now = time.time()
+
+        if self.latency < now - job.ts:
+            self.latency = now - job.ts
+
+        cv2.putText(job.frame, '%3i ms' % (self.latency * 1000),
+                    (w - 60, 25), FONT, 0.4, BLACK)
 
         if self.face and getattr(job, 'face', None) is not None:
             cv2.rectangle(job.frame,
@@ -57,6 +57,8 @@ class Preview(Worker):
             for x, y in np.int32(job.lms):
                 try:
                     cv2.circle(job.frame, (x, y), 1, RED, -1)
+                except KeyboardInterrupt:
+                    raise
                 except:
                     pass
 
@@ -83,11 +85,7 @@ class Preview(Worker):
                             (30 + 20 * i, h - 20), FONT, vowel, BLACK)
 
             if getattr(job, 'audio_volume', None) is not None:
-                cv2.putText(job.frame, 'V: %5.2f' % job.audio_volume,
-                            (20, h - 65), FONT, 0.4, BLACK)
-                cv2.putText(job.frame, 'F: %5.2f' % job.audio_noise_floor,
-                            (20, h - 55), FONT, 0.4, BLACK)
-                cv2.putText(job.frame, 'D: %5.2f' % job.audio_denoise,
+                cv2.putText(job.frame, '%5.2f dB' % job.audio_volume,
                             (20, h - 45), FONT, 0.4, BLACK)
 
         cv2.imshow('Skupa Preview', job.frame)

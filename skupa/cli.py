@@ -10,17 +10,16 @@ def main(**kw):
     pass
 
 
-@main.command('camera', help='OpenCV-based camera input')
-@click.option('-d', '--device', default=0, help='Device number')
-def camera(device):
-    from skupa.video.camera import CameraFeed
-    return CameraFeed(device)
+@main.command('live', help='GStreamer-based live audio/video input')
+def live():
+    from skupa.source.live import LiveFeed
+    return LiveFeed()
 
 
 @main.command('playback', help='GStreamer-based audio/video playback')
 @click.option('-f', '--path', help='File path', required=True)
 def playback(path):
-    from skupa.video.playback import PlaybackFeed
+    from skupa.source.playback import PlaybackFeed
     return PlaybackFeed(path)
 
 
@@ -127,8 +126,7 @@ def run_pipeline(workers):
         print("Run `skupa --help' to get a list.")
         return
 
-    meta = {}
-    pipe = Pipeline(meta)
+    pipe = Pipeline()
 
     for worker in workers:
         pipe.add_worker(worker)
@@ -136,6 +134,12 @@ def run_pipeline(workers):
     async def amain():
         loop = get_running_loop()
         loop.set_default_executor(ThreadPoolExecutor(32))
+
+        def handler(loop, context):
+            loop.default_exception_handler(context)
+            os._exit(2)
+
+        loop.set_exception_handler(handler)
 
         await pipe.start()
         async for job in pipe.run():

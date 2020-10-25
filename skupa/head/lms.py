@@ -36,6 +36,9 @@ class HeadPoseEstimator(Worker):
         # In radians for easier averaging.
         self.rpy = np.zeros(3)
 
+        # We need to reset the correction on the first frame.
+        self.first_frame = True
+
     def reset(self, hint=None):
         if hint != 'rpy':
             return
@@ -67,6 +70,10 @@ class HeadPoseEstimator(Worker):
 
         for i in range(3):
             self.rpy[i] = circmean([self.rpy[i]] * 4 + [rpy[i]] * 1)
+
+        if self.first_frame:
+            self.first_frame = False
+            self.reset('rpy')
 
         rot = Rotation.from_euler('xyz', self.rpy) * self.correction
         job.rpy = rot.as_euler('xyz', degrees=True)

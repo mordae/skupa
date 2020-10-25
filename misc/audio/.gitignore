@@ -1,1 +1,3 @@
 *.wav
+*.pickle
+*.onnx

@@ -8,7 +8,7 @@
 #
 
 from os.path import join, dirname
-from skupa.util import defer
+from skupa.util import defer, resize_and_pad
 from skupa.pipe import Worker
 
 import cv2
@@ -76,13 +76,6 @@ class FaceDetector(Worker):
         self.slim = slim
 
 
-    def prepare(self, meta):
-        self.meta = meta
-
-        meta['width']  = max(meta.get('width',  0), MODEL_WIDTH)
-        meta['height'] = max(meta.get('height', 0), MODEL_HEIGHT)
-
-
     async def start(self):
         opts = ort.SessionOptions()
         opts.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
@@ -105,7 +98,7 @@ class FaceDetector(Worker):
             return
 
         image = cv2.cvtColor(job.frame, cv2.COLOR_BGR2RGB)
-        image = cv2.resize(image, (MODEL_WIDTH, MODEL_HEIGHT))
+        image, ratio = resize_and_pad(image, (MODEL_HEIGHT, MODEL_WIDTH))
         image_mean = np.array([127, 127, 127])
         image = (image - image_mean) / 128
         image = np.transpose(image, [2, 0, 1])
@@ -115,20 +108,15 @@ class FaceDetector(Worker):
         conf, boxes = await defer(self.session.run, None, {self.input_name: image})
         boxes, probs = self._predict(conf, boxes, 0.8)
 
-        h, w, _ = job.frame.shape
-
         if len(boxes) > 0:
-            boxes[:, 0] *= w
-            boxes[:, 1] *= h
-            boxes[:, 2] *= w
-            boxes[:, 3] *= h
+            boxes[:, 0] *= MODEL_WIDTH  / ratio
+            boxes[:, 1] *= MODEL_HEIGHT / ratio
+            boxes[:, 2] *= MODEL_WIDTH  / ratio
+            boxes[:, 3] *= MODEL_HEIGHT / ratio
 
-        # Order faces from left.
-        boxes = list(sorted(boxes, key=lambda b: b[0]))
+            # Order faces from left.
+            boxes = list(sorted(boxes, key=lambda b: b[0]))
 
-        # TODO: Maybe return the middle one?
-
-        if len(boxes) > 0:
             if not self.average.any():
                 self.average = boxes[0]
             else:

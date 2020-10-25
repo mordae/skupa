@@ -10,10 +10,9 @@ __all__ = ['Pipeline', 'Worker', 'Job']
 
 
 class Pipeline:
-    def __init__(self, meta):
+    def __init__(self):
         self.workers = []
         self.clock = -1
-        self.meta = meta
 
 
     def add_worker(self, worker):
@@ -22,7 +21,7 @@ class Pipeline:
 
 
     async def start(self):
-        order, unmet, duped = solve_pipeline(self.workers)
+        order, unmet, duped, avail = solve_pipeline(self.workers)
 
         assert not unmet, \
             'Pipeline dependencies not satisfied: {deps}' \
@@ -32,10 +31,10 @@ class Pipeline:
             'Pipeline has multiple sources of: {deps}' \
                 .format(deps=duped)
 
-        self.workers = order
+        assert 'frame' in avail, \
+            'Pipeline does not have a source element'
 
-        for worker in reversed(self.workers):
-            worker.prepare(self.meta)
+        self.workers = order
 
         for worker in self.workers:
             await worker.start()
@@ -57,7 +56,7 @@ class Pipeline:
                 old.dispose()
 
             self.clock += 1
-            job = Job(self.clock, job, self.meta)
+            job = Job(self.clock, job)
 
             for worker in self.workers:
                 task = asyncio.create_task(worker._handle(job))
@@ -80,9 +79,6 @@ class Worker:
 
     def __init__(self):
         self.pipeline = None
-
-    def prepare(self, meta):
-        self.meta = meta
 
     def set_pipeline(self, pipeline):
         self.pipeline = pipeline
@@ -108,12 +104,11 @@ class Worker:
 
 
 class Job:
-    def __init__(self, tick, prev, meta):
+    def __init__(self, tick, prev):
         self.id = tick
-        self.ts = time.time()
+        self.ts = None
 
         self.prev = prev
-        self.meta = meta
 
         self._tasks = []
         self._deps  = {}
@@ -123,6 +118,10 @@ class Job:
             await task
 
         return self
+
+    def mark_start(self):
+        assert self.ts is None, 'mark_start called repeatedly'
+        self.ts = time.time()
 
     def __repr__(self):
         return 'Job(id={})'.format(self.id)
@@ -166,7 +165,7 @@ def solve_pipeline(workers):
         if not removed:
             break
 
-    return order, unmet, duped
+    return order, unmet, duped, avail
 
 
 # vim:set sw=4 ts=4 et:

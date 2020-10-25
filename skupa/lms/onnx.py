@@ -32,12 +32,6 @@ class LandmarkDetector(Worker):
     def __init__(self, tracking):
         self.tracking = tracking
 
-    def prepare(self, meta):
-        self.meta = meta
-
-        meta['width']  = max(meta.get('width',  0), 320)
-        meta['height'] = max(meta.get('height', 0), 240)
-
     async def start(self):
         opts = ort.SessionOptions()
         opts.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
@@ -91,7 +85,13 @@ class LandmarkDetector(Worker):
         lms[:, 1] = lms[:, 1] * detail[0] + detail[2]
 
         if self.tracking:
-            job.lms = self.tracker.track(job.frame, lms)
+            try:
+                job.lms = self.tracker.track(job.frame, lms)
+            except KeyboardInterrupt:
+                raise
+            except:
+                print('Tracker failed...')
+                job.lms = lms
 
         else:
             if not self.average.any():

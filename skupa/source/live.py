@@ -16,47 +16,33 @@ Gst.init(None)
 from skupa.pipe import Worker
 from skupa.util import defer
 
-from os.path import abspath
+
+__all__ = ['LiveFeed']
 
 
-__all__ = ['PlaybackFeed']
-
-
-class PlaybackFeed(Worker):
+class LiveFeed(Worker):
     provides = ['frame', 'audio']
 
-    def __init__(self, path):
-        self.path = path
+    def __init__(self):
+        pass
 
     async def start(self):
-        self.pipeline = Gst.ElementFactory.make('playbin3')
-
-        if '://' in self.path:
-            self.pipeline.set_property('uri', self.path)
-        else:
-            self.pipeline.set_property('uri', 'file://' + abspath(self.path))
-
-        videocaps = Gst.Caps.new_empty_simple('video/x-raw')
-        videocaps.set_value('format', 'BGR')
-
-        self.videosink = GstApp.AppSink()
-        self.videosink.set_max_buffers(60)
-        self.videosink.set_property('caps', videocaps)
-        self.pipeline.set_property('video-sink', self.videosink)
-
-        audio = Gst.parse_bin_from_description('''
-            tee name=t
+        self.pipeline = Gst.parse_launch('''
+            autovideosrc
             ! queue
-            ! autoaudiosink
-            t.
+            ! video/x-raw, format=BGR
+            ! appsink name=video max-buffers=60
+
+            autoaudiosrc
             ! queue
             ! audioconvert
             ! audioresample
             ! audio/x-raw, format=S16LE, channels=1, rate=44100
             ! appsink name=audio max-buffers=60
-        ''', True)
-        self.audiosink = audio.get_by_name('audio')
-        self.pipeline.set_property('audio-sink', audio)
+        ''')
+
+        self.videosink = self.pipeline.get_by_name('video')
+        self.audiosink = self.pipeline.get_by_name('audio')
 
         self.pipeline.set_state(Gst.State.PLAYING)
 
@@ -68,6 +54,7 @@ class PlaybackFeed(Worker):
             await job.prev._deps['frame']
 
         frame = await defer(self.videosink.pull_sample)
+        job.mark_start()
 
         samples = []
         while True:
@@ -117,7 +104,6 @@ class PlaybackFeed(Worker):
             adata += abuf.extract_dup(0, abuf.get_size())
 
         job.audio = np.frombuffer(adata, dtype='<i2')
-        print(job.id, len(job.audio))
 
 
 # vim:set sw=4 ts=4 et:

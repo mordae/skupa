@@ -9,7 +9,7 @@ from os.path import join, dirname
 
 from skupa.lms.tracker import Tracker
 from skupa.pipe import Worker
-from skupa.util import defer
+from skupa.util import defer, resize_and_pad
 
 
 __all__ = ['LandmarkDetector']
@@ -17,8 +17,8 @@ __all__ = ['LandmarkDetector']
 
 MODEL_PATH = join(dirname(__file__), '..', 'model', 'lms-dlib', '68.dat')
 
-MODEL_WIDTH  = 640
-MODEL_HEIGHT = 480
+MODEL_WIDTH  = 320
+MODEL_HEIGHT = 240
 
 
 class LandmarkDetector(Worker):
@@ -27,12 +27,6 @@ class LandmarkDetector(Worker):
 
     def __init__(self, tracking):
         self.tracking = tracking
-
-    def prepare(self, meta):
-        self.meta = meta
-
-        meta['width']  = max(meta.get('width',  0), MODEL_WIDTH)
-        meta['height'] = max(meta.get('height', 0), MODEL_HEIGHT)
 
     async def start(self):
         self.predictor = dlib.shape_predictor(MODEL_PATH)
@@ -47,12 +41,20 @@ class LandmarkDetector(Worker):
             return
 
         gray = cv2.cvtColor(job.frame, cv2.COLOR_BGR2GRAY)
+        small, ratio = resize_and_pad(gray, (MODEL_HEIGHT, MODEL_WIDTH))
 
-        shape = await defer(self.predictor, gray, dlib.rectangle(*job.face))
-        lms = np.array([[pt.x, pt.y] for pt in shape.parts()])
+        face = (job.face * ratio).astype(np.int)
+        shape = await defer(self.predictor, small, dlib.rectangle(*face))
+        lms = np.array([[pt.x, pt.y] for pt in shape.parts()]) / ratio
 
         if self.tracking:
-            job.lms = self.tracker.track(job.frame, lms)
+            try:
+                job.lms = self.tracker.track(job.frame, lms)
+            except KeyboardInterrupt:
+                raise
+            except:
+                print('Tracker failed...')
+                job.lms = lms
 
         else:
             if not self.average.any():

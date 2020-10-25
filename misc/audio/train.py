@@ -3,6 +3,8 @@
 
 import numpy as np
 import wave
+import pickle
+import os.path
 
 from scipy.signal import blackman, welch
 from sklearn.neural_network import MLPClassifier
@@ -11,7 +13,6 @@ from skl2onnx.common.data_types import FloatTensorType
 
 
 RATE = 44100
-SAMPLE = RATE // 60
 
 cutoff = 100
 
@@ -31,58 +32,77 @@ feat = []
 
 prevd = np.zeros(cutoff)
 
-for mi, path in enumerate(files):
-    print('learning', labels[mi], 'from', path)
+if not os.path.exists('data.pickle'):
+    for mi, path in enumerate(files):
+        print('learning', labels[mi], 'from', path)
 
-    for mul in [0.5, 0.7, 0.85, 1.0, 1.1, 1.25, 1.5, 2.0]:
-        for roll in [-2, -1, 0, +1, +2]:
-            wav = wave.open(path, 'rb')
+        for sps in [30, 60]:
+            print('- sps', sps)
 
-            while True:
-                chunk = np.frombuffer(wav.readframes(SAMPLE), dtype='<i2')
+            sample = RATE // sps
 
-                if len(chunk) == 0:
-                    break
+            for mul in [1/6, 1/3, 1.0, 3.0, 6.0]:
+                print('- volume', mul)
 
-                if len(chunk) < SAMPLE:
-                    chunk = np.float64(list(chunk) + [0] * (SAMPLE - len(chunk)))
+                for roll in [-2, -1, 0, +1, +2]:
+                    print('- pitch roll', roll)
 
-                # Learn at different volume levels
-                chunk = chunk * mul
+                    wav = wave.open(path, 'rb')
 
-                volume = 20. * np.log10(np.max(np.abs(chunk)) / 32768)
+                    while True:
+                        chunk = np.frombuffer(wav.readframes(sample), dtype='<i2')
 
-                freqs, densities = welch(chunk, RATE, nperseg=len(chunk))
-                freqs = freqs[:cutoff]
-                densities = densities[:cutoff]
-                densities = 20. * np.log10(densities)
-                densities = np.nan_to_num(densities)
+                        if len(chunk) < sample:
+                            break
 
-                # Learn at different frequencies
-                chunk = np.roll(chunk, roll)
+                        # Learn at different volume levels
+                        chunk = chunk * mul
 
-                # Add some normal noise
-                chunk += np.random.normal(0, 2, len(chunk))
+                        # Learn at different frequencies
+                        chunk = np.roll(chunk, roll)
 
-                if roll > 0:
-                    chunk[:roll] = 0
-                else:
-                    chunk[roll:] = 0
+                        if roll > 0:
+                            chunk[:roll] = 0
+                        else:
+                            chunk[roll:] = 0
 
-                data.append([*densities, *prevd, volume])
-                feat.append(mi)
+                        # Add some normal noise
+                        chunk += np.random.normal(0, 2, len(chunk))
 
-                prevd = 0.5 * prevd + 0.5 * densities
+                        volume = 20. * np.log10(np.max(np.abs(chunk)) / 32768)
 
-            wav.close()
+                        freqs, densities = welch(chunk, RATE, nperseg=len(chunk))
+                        freqs = freqs[:cutoff]
+                        densities = densities[:cutoff]
+                        densities = 20. * np.log10(densities)
+                        densities = np.nan_to_num(densities)
 
-print('fitting')
-model = MLPClassifier(hidden_layer_sizes=(101, 24),
-                      solver='sgd',
+                        # Add more noise to the densities.
+                        densities += np.random.normal(0, 2, len(densities))
+
+                        data.append(np.array([*densities, *prevd, volume]))
+                        feat.append(mi)
+
+                        prevd = 0.5 * prevd + 0.5 * densities
+
+                    wav.close()
+
+    with open('data.pickle', 'wb') as fp:
+        print('Saving data.pickle...')
+        pickle.dump((data, feat), fp)
+
+else:
+    print('Loading data.pickle...')
+    with open('data.pickle', 'rb') as fp:
+        data, feat = pickle.load(fp)
+
+
+print('Fitting...')
+model = MLPClassifier(hidden_layer_sizes=(60, 30, 24, 12),
+                      #solver='sgd',
+                      #learning_rate='adaptive',
                       #solver='lbfgs',
-                      alpha=0.0001,
-                      max_iter=1000,
-                      learning_rate='adaptive',
+                      max_iter=10,
                       verbose=True)
 
 model = model.fit(data, feat)

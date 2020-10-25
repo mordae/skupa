@@ -4,7 +4,6 @@
 import asyncio
 import numpy as np
 import onnxruntime as ort
-import pyaudio
 
 from os.path import join, dirname, exists
 from scipy.signal import blackman, welch
@@ -19,33 +18,20 @@ __all__ = ['AudioMouthTracker']
 MODEL_PATH = join(dirname(__file__), '..', 'model',
                   'audio', 'audio-{lang}.onnx')
 
-RATE  = 44100
-SPS   = 60
-
-SAMPLE_SIZE = RATE // SPS
-CUTOFF      = 100
-
+RATE   = 44100
+CUTOFF = 100
 LABELS = ['A', 'E', 'I', 'O', 'U', '-']
 
+# How quickly the mouth changes shape to incorporate target vowels.
+VOWEL_ATTACK_RATE = .9
 
-# How many dB above the floor is it still noise?
-NOISE_BAND = 2.
-
-# Speed of noise floor rising.
-# Must be significant but allow for a drop during moments of silence.
-NOISE_CLIMB = .0001
-
-# Aggresivity of noise profile update.
-# Must be high enough to compensate for NOISE_CLIMB during moments of silence.
-NOISE_RATIO = .001
-
-# How quickly do vowels decay.
-# That is, how quickly does the mouth close after each sound.
-VOWEL_DECAY_RATE = 0.8
+# How quickly do the vowels decay.
+VOWEL_DECAY_RATE = .8
 
 
 class AudioMouthTracker(Worker):
     provides = ['mouth']
+    requires = ['frame']
 
     def __init__(self, language):
         self.language = language
@@ -63,28 +49,17 @@ class AudioMouthTracker(Worker):
         self.input_name = self.session.get_inputs()[0].name
         self.output_name = self.session.get_outputs()[0].name
 
-        self.frames = []
-        self.task = asyncio.create_task(self._read_frames())
-
-        self.audio = pyaudio.PyAudio()
-
-        self.stream = self.audio.open(format=pyaudio.paInt16,
-                                      channels=1,
-                                      rate=RATE,
-                                      input=True,
-                                      frames_per_buffer=(SAMPLE_SIZE * 2))
+        # Individual audio buffers.
+        self.adata = []
 
         # Current vowel weights.
-        self.vowels = np.zeros(len(LABELS))
+        self.vowels  = np.zeros(len(LABELS))
+
+        # Averaged vowel weights to smoothen mouth movement.
+        self.average = np.zeros(len(LABELS))
 
         # Previous frequencies for smoothing.
         self.prev = np.zeros(CUTOFF)
-
-        # Noise profile for noise reduction.
-        self.noise = np.zeros(CUTOFF)
-
-        # Start really high and drop to make sure we start filtering quickly.
-        self.noise_floor = 0.
 
         # Most recent volume.
         self.volume = 0.
@@ -96,39 +71,49 @@ class AudioMouthTracker(Worker):
             self.frames.append(frame)
 
     async def process(self, job):
-        while len(self.frames) > 0:
-            frame = self.frames.pop(0)
+        if len(job.audio) > 0:
+            self.adata.append(job.audio)
 
-            window = blackman(len(frame))
-            self.volume = 20. * np.log10(np.max(np.abs(frame)) / 32768)
+        frame_size = round(RATE / job.frame_rate)
+        frame = np.zeros(frame_size, dtype='<i2')
+        sofar = 0
 
-            freqs, densities = welch(frame, RATE, nperseg=len(frame))
-            freqs = freqs[:CUTOFF]
+        while sofar < frame_size:
+            if not self.adata:
+                print('Audio buffer underflow...')
 
-            densities = densities[:CUTOFF]
-            densities = 20. * np.log10(densities)
-            densities = np.nan_to_num(densities)
+                if sofar:
+                    self.adata.insert(0, frame[:sofar])
 
-            self.noise_floor += NOISE_CLIMB
+                return
 
-            if self.noise_floor < -120:
-                self.noise_floor = 0.
+            chunk = self.adata.pop(0)
+            needed = frame_size - sofar
 
-            if np.abs(np.max(self.noise)) > 30:
-                self.noise *= 0.
+            if len(chunk) < needed:
+                frame[sofar : sofar + len(chunk)] = chunk
+                sofar += len(chunk)
 
-            if self.volume < self.noise_floor + NOISE_BAND:
-                self.noise_floor = self.noise_floor * 0.99 + self.volume * 0.01
-                self.noise = self.noise * (1. - NOISE_RATIO) \
-                           + densities  * NOISE_RATIO
+            else:
+                frame[sofar:] = chunk[:needed]
+                sofar += needed
+                self.adata.insert(0, chunk[needed:])
 
-            densities -= self.noise
-            densities[densities < 0] = 0
+        window = blackman(len(frame))
+        self.volume = 20. * np.log10(np.max(np.abs(frame)) / 32768)
 
+        freqs, densities = welch(frame, job.frame_rate, nperseg=len(frame))
+        freqs = freqs[:CUTOFF]
+
+        densities = densities[:CUTOFF]
+        densities = 20. * np.log10(densities)
+        densities = np.nan_to_num(densities)
+
+        if True:
             # Decay weights over time.
-            self.vowels *= VOWEL_DECAY_RATE
+            self.vowels = np.around(self.vowels * VOWEL_DECAY_RATE, 4)
 
-            if self.volume > self.noise_floor + 6 * NOISE_BAND:
+            if True:
                 # Identify the vowel (or silence).
                 inputs = [*densities, *self.prev, self.volume]
                 res = await defer(self.session.run,
@@ -145,19 +130,21 @@ class AudioMouthTracker(Worker):
                 self.vowels[vowel] = [.7, .5, .7, .7, .7, 1.][vowel]
 
                 # Open mouth a bit for other vowels to be seen
-                if vowel != 5 and self.vowels[0] < 0.4:
-                    self.vowels[0] = 0.4
+                if vowel != 5 and self.vowels[0] < .3:
+                    self.vowels[0] = .3
 
             # Smooth out densities over time.
-            self.prev = self.prev * 0.5 + densities * 0.5
+            self.prev = self.prev * .5 + densities * .5
+
+        # Make vowels attack non-instantly.
+        self.average = self.average * (1. - VOWEL_ATTACK_RATE) \
+                     + self.vowels  *       VOWEL_ATTACK_RATE
 
         # Present the output.
-        job.mouth = self.vowels[:5]
+        job.mouth = self.average[:5]
 
         # Also include some misc information.
-        job.audio_volume      = self.volume
-        job.audio_noise_floor = self.noise_floor
-        job.audio_denoise     = np.max(self.noise)
+        job.audio_volume = self.volume
 
 
 # vim:set sw=4 ts=4 et:
