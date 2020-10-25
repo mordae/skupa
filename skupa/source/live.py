@@ -30,7 +30,9 @@ class LiveFeed(Worker):
         self.pipeline = Gst.parse_launch('''
             autovideosrc
             ! queue
+            ! videoconvert
             ! video/x-raw, format=BGR
+            ! videoconvert
             ! appsink name=video max-buffers=60
 
             autoaudiosrc
