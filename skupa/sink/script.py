@@ -12,7 +12,7 @@ __all__ = ['ScriptSink']
 
 
 class ScriptSink(Worker):
-    after = ['rpy', 'eyes', 'mouth']
+    requires = ['rpy', 'eyes', 'mouth']
 
     def __init__(self, path):
         self.path = path

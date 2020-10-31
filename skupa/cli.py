@@ -23,6 +23,13 @@ def playback(path):
     return PlaybackFeed(path)
 
 
+@main.command('script', help='Replay script without any A/V')
+@click.option('-f', '--path', help='Script path', required=True)
+def script(path):
+    from skupa.source.script import ScriptSource
+    return ScriptSource(path)
+
+
 @main.command('dlib-face', help='DLib-based face detector')
 def dlib_face():
     from skupa.face.dlib import FaceDetector
