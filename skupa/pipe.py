@@ -128,8 +128,6 @@ class Job:
 
     def dispose(self):
         self.prev = None
-        self._tasks = None
-        self._deps = None
 
 
 def solve_pipeline(workers):

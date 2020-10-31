@@ -17,6 +17,7 @@ from skupa.pipe import Worker
 from skupa.util import defer
 
 from os.path import abspath
+from urllib.parse import quote
 
 
 __all__ = ['PlaybackFeed']
@@ -32,31 +33,36 @@ class PlaybackFeed(Worker):
         self.pipeline = Gst.ElementFactory.make('playbin3')
 
         if '://' in self.path:
-            self.pipeline.set_property('uri', self.path)
+            self.pipeline.set_property('uri', quote(self.path))
         else:
-            self.pipeline.set_property('uri', 'file://' + abspath(self.path))
+            quri = quote('file://' + abspath(self.path), ':/')
+            self.pipeline.set_property('uri', quri)
 
-        videocaps = Gst.Caps.new_empty_simple('video/x-raw')
-        videocaps.set_value('format', 'BGR')
+        self.pipeline.set_property('video-sink',
+            Gst.parse_bin_from_description('''
+                queue
+                ! videoconvert
+                ! video/x-raw, format=BGR
+                ! videoconvert
+                ! appsink name=video max-buffers=60
+            ''', True))
 
-        self.videosink = GstApp.AppSink()
-        self.videosink.set_max_buffers(60)
-        self.videosink.set_property('caps', videocaps)
-        self.pipeline.set_property('video-sink', self.videosink)
+        self.pipeline.set_property('audio-sink',
+            Gst.parse_bin_from_description('''
+                tee name=t
+                ! queue
+                ! autoaudiosink
 
-        audio = Gst.parse_bin_from_description('''
-            tee name=t
-            ! queue
-            ! autoaudiosink
-            t.
-            ! queue
-            ! audioconvert
-            ! audioresample
-            ! audio/x-raw, format=S16LE, channels=1, rate=44100
-            ! appsink name=audio max-buffers=60
-        ''', True)
-        self.audiosink = audio.get_by_name('audio')
-        self.pipeline.set_property('audio-sink', audio)
+                t.
+                ! queue
+                ! audioconvert
+                ! audioresample
+                ! audio/x-raw, format=S16LE, channels=1, rate=44100
+                ! appsink name=audio max-buffers=60
+            ''', True))
+
+        self.videosink = self.pipeline.get_property('video-sink').get_by_name('video')
+        self.audiosink = self.pipeline.get_property('audio-sink').get_by_name('audio')
 
         self.pipeline.set_state(Gst.State.PLAYING)
 

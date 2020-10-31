@@ -31,7 +31,7 @@ VOWEL_DECAY_RATE = .8
 
 class AudioMouthTracker(Worker):
     provides = ['mouth']
-    requires = ['frame']
+    requires = ['frame', 'audio']
 
     def __init__(self, language):
         self.language = language

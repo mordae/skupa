@@ -8,10 +8,10 @@ import json
 from skupa.pipe import Worker
 
 
-__all__ = ['JSONProtocol']
+__all__ = ['JSONSink']
 
 
-class JSONProtocol(Worker):
+class JSONSink(Worker):
     after = ['rpy', 'eyes', 'mouth']
 
     def __init__(self, host, port, index):
@@ -26,6 +26,11 @@ class JSONProtocol(Worker):
         return self.client.send_message(route, items)
 
     async def process(self, job):
+        # Make sure that the previous job have finished to ensure
+        # proper ordering.
+        if job.prev is not None:
+            await job.prev.done()
+
         data = {'index': self.index}
 
         if getattr(job, 'rpy', None) is not None:

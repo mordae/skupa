@@ -72,13 +72,6 @@ def auto_eyes(interval):
     return EyesTracker(interval)
 
 
-@main.command('headband', help='Headbandroll/pitch/yaw reader')
-@click.option('-d', '--device', default='/dev/ttyUSB0', help='Serial port')
-def headband(**kw):
-    from skupa.head.headband import HeadPoseReader
-    return HeadPoseReader(**kw)
-
-
 @main.command('audio-mouth', help='Audio-based mouth tracking')
 @click.option('-l', '--language', default='cs', help='Language model to use')
 def audio_mouth(language):
@@ -86,22 +79,20 @@ def audio_mouth(language):
     return AudioMouthTracker(language)
 
 
-@main.command('osc-proto', help='OSC-based network sender')
+@main.command('json-sink', help='UDP/JSON-based network sender')
 @click.option('-h', '--host', default='localhost', help='Recipient host')
 @click.option('-p', '--port', default=9001, help='Recipient port')
 @click.option('-i', '--index', default=0, help='Face index to use')
-def osc_proto(**kw):
-    from skupa.proto.osc import OSCProtocol
-    return OSCProtocol(**kw)
+def json_sink(**kw):
+    from skupa.sink.json import JSONSink
+    return JSONSink(**kw)
 
 
-@main.command('json-proto', help='UDP/JSON-based network sender')
-@click.option('-h', '--host', default='localhost', help='Recipient host')
-@click.option('-p', '--port', default=9001, help='Recipient port')
-@click.option('-i', '--index', default=0, help='Face index to use')
-def osc_proto(**kw):
-    from skupa.proto.json import JSONProtocol
-    return JSONProtocol(**kw)
+@main.command('script-sink', help='Sink script to a file for later')
+@click.option('-f', '--path', help='File path', required=True)
+def script_sink(**kw):
+    from skupa.sink.script import ScriptSink
+    return ScriptSink(**kw)
 
 
 @main.command('preview', help='OpenCV-based preview')
