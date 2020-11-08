@@ -30,6 +30,7 @@ setup(**{
         'PyAudio       >= 0.2',
         'pyserial      >= 3.4',
         'scipy         >= 1.4',
+        'PyGObject     >= 3.36',
     ],
     'zip_safe': False,
 })
