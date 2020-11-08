@@ -7,7 +7,16 @@ import numpy as np
 import os
 import time
 
+import gi
+gi.require_version('Gst', '1.0')
+
+from gi.repository import Gst
+Gst.init(None)
+
 from skupa.pipe import Worker
+
+from os.path import abspath
+from urllib.parse import quote
 
 
 __all__ = ['ScriptSource']
@@ -16,12 +25,34 @@ __all__ = ['ScriptSource']
 class ScriptSource(Worker):
     provides = ['frame', 'rpy', 'mouth', 'eyes']
 
-    def __init__(self, path):
-        self.path = path
+    def __init__(self, path, audio=None, offset=0):
+        self.path   = path
+        self.audio  = audio
+        self.offset = offset
+
+
+    def start_audio(self):
+        self.pipeline = Gst.ElementFactory.make('playbin3')
+
+        if '://' in self.path:
+            self.pipeline.set_property('uri', quote(self.audio))
+        else:
+            quri = quote('file://' + abspath(self.audio), ':/')
+            self.pipeline.set_property('uri', quri)
+            self.pipeline.set_property('av-offset', self.offset)
+
+        self.pipeline.set_property('video-sink',
+            Gst.parse_bin_from_description('fakesink', True))
+
+        self.pipeline.set_state(Gst.State.PLAYING)
+
 
     async def start(self):
         self.frames = []
         self.rate = None
+
+        if self.audio is not None:
+            self.start_audio()
 
         with open(self.path, 'r') as fp:
             for line in fp.readlines():

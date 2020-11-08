@@ -25,9 +25,11 @@ def playback(path):
 
 @main.command('script', help='Replay script without any A/V')
 @click.option('-f', '--path', help='Script path', required=True)
-def script(path):
+@click.option('-a', '--audio-path', help='Audio file path')
+@click.option('-o', '--audio-offset', help='Audio offset', default=0)
+def script(path, audio_path=None, audio_offset=0):
     from skupa.source.script import ScriptSource
-    return ScriptSource(path)
+    return ScriptSource(path, audio_path, audio_offset)
 
 
 @main.command('dlib-face', help='DLib-based face detector')
