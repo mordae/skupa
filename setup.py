@@ -31,6 +31,7 @@ setup(**{
         'pyserial      >= 3.4',
         'scipy         >= 1.4',
         'PyGObject     >= 3.36',
+        'srt           >= 3.4',
     ],
     'zip_safe': False,
 })

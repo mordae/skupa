@@ -88,6 +88,13 @@ def audio_mouth(language):
     return AudioMouthTracker(language)
 
 
+@main.command('ann-srt', help='SRT-based annotations')
+@click.option('-f', '--path', help='Path to the subtitles', required=True)
+def ann_srt(path):
+    from skupa.ann.srt import AnnotateFromSRT
+    return AnnotateFromSRT(path)
+
+
 @main.command('json-sink', help='UDP/JSON-based network sender')
 @click.option('-h', '--host', default='localhost', help='Recipient host')
 @click.option('-p', '--port', default=9001, help='Recipient port')

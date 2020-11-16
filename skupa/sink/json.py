@@ -12,7 +12,7 @@ __all__ = ['JSONSink']
 
 
 class JSONSink(Worker):
-    after = ['rpy', 'eyes', 'mouth']
+    after = ['rpy', 'eyes', 'mouth', 'emote']
 
     def __init__(self, host, port, index):
         self.host  = host
@@ -41,6 +41,9 @@ class JSONSink(Worker):
 
         if getattr(job, 'mouth', None) is not None:
             data['mouth'] = [round(float(x), 5) for x in job.mouth]
+
+        if getattr(job, 'emote', None) is not None:
+            data['emote'] = job.emote
 
         bstr = json.dumps(data).encode('utf8')
         self.socket.sendto(bstr, (self.host, self.port))

@@ -13,6 +13,7 @@ __all__ = ['ScriptSink']
 
 class ScriptSink(Worker):
     requires = ['rpy', 'eyes', 'mouth']
+    after    = ['emote']
 
     def __init__(self, path):
         self.path = path
@@ -44,6 +45,9 @@ class ScriptSink(Worker):
 
         if getattr(job, 'mouth', None) is not None:
             data['mouth'] = [round(float(x), 3) for x in job.mouth]
+
+        if getattr(job, 'emote', None) is not None:
+            data['emote'] = job.emote
 
         json.dump(data, self.fp)
         self.fp.write('\n')

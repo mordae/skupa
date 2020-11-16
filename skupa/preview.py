@@ -22,7 +22,7 @@ BLACK = (  0,   0,   0)
 
 
 class Preview(Worker):
-    after = ['frame', 'face', 'lms', 'rpy', 'eyes', 'mouth']
+    after = ['frame', 'face', 'lms', 'rpy', 'eyes', 'mouth', 'emote']
 
     def __init__(self, face, lms, rpy, eyes, mouth):
         self.face  = face
