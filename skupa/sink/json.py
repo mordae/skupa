@@ -45,6 +45,9 @@ class JSONSink(Worker):
         if getattr(job, 'emote', None) is not None:
             data['emote'] = job.emote
 
+        if getattr(job, 'trigger', None) is not None:
+            data['trigger'] = job.trigger
+
         bstr = json.dumps(data).encode('utf8')
         self.socket.sendto(bstr, (self.host, self.port))
 

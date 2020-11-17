@@ -49,6 +49,9 @@ class ScriptSink(Worker):
         if getattr(job, 'emote', None) is not None:
             data['emote'] = job.emote
 
+        if getattr(job, 'trigger', None) is not None:
+            data['trigger'] = job.trigger
+
         json.dump(data, self.fp)
         self.fp.write('\n')
         self.fp.flush()

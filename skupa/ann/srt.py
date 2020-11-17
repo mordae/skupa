@@ -16,7 +16,7 @@ EMOTES = {'angry', 'fun', 'joy', 'sorrow', 'surprised'}
 
 class AnnotateFromSRT(Worker):
     requires = ['frame']
-    provides = ['emote']
+    provides = ['emote', 'trigger']
 
     def __init__(self, path):
         self.path = path
@@ -27,6 +27,7 @@ class AnnotateFromSRT(Worker):
 
     async def process(self, job):
         job.emote = None
+        job.trigger = set()
 
         now = datetime.timedelta(seconds=job.id / job.frame_rate)
 
@@ -36,7 +37,9 @@ class AnnotateFromSRT(Worker):
                     if word in EMOTES:
                         job.emote = word
                     else:
-                        print('WARNING:', 'unknown annotation:', word)
+                        job.trigger.add(word)
+
+        job.trigger = list(job.trigger)
 
 
 # vim:set sw=4 ts=4 et:
