@@ -123,16 +123,6 @@ class AudioMouthTracker(Worker):
                 # This is the vowel model heard the best.
                 vowel = int(res[0])
 
-                # TODO: Maybe remove this adjustments and leave
-                #       them to the recipient?
-
-                # More is too pronounced, so add just this much.
-                self.vowels[vowel] = [.7, .5, .7, .7, .7, 1.][vowel]
-
-                # Open mouth a bit for other vowels to be seen
-                if vowel != 5 and self.vowels[0] < .3:
-                    self.vowels[0] = .3
-
             # Smooth out densities over time.
             self.prev = self.prev * .5 + densities * .5
 
