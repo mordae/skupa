@@ -11,6 +11,7 @@ __all__ = ['EyesTracker']
 
 
 class EyesTracker(Worker):
+    requires = ['frame']
     provides = ['eyes']
 
     def __init__(self, interval):
@@ -19,7 +20,7 @@ class EyesTracker(Worker):
     async def process(self, job):
         job.eyes = np.ones(2)
 
-        fnow = time.time()
+        fnow = job.id / job.frame_rate
         inow = int(fnow)
 
         if 0 != inow % self.interval:
