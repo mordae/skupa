@@ -54,6 +54,11 @@ class Preview(Worker):
                           tuple(job.face[:2]), tuple(job.face[2:]),
                           GREEN, 1)
 
+        if self.lms and getattr(job, 'lms_box', None) is not None:
+            cv2.rectangle(job.frame,
+                          tuple(job.lms_box[:2]), tuple(job.lms_box[2:]),
+                          RED, 1)
+
         if self.lms and getattr(job, 'lms', None) is not None:
             for x, y in np.int32(job.lms):
                 try:

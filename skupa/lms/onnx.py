@@ -67,14 +67,14 @@ class LandmarkDetector(Worker):
         h, w, _ = crop_image.shape
         crop_image = cv2.resize(crop_image, (MODEL_WIDTH, MODEL_HEIGHT))
 
-        return crop_image, ([h, w, box[1], box[0]])
+        return box, crop_image, ([h, w, box[1], box[0]])
 
     async def process(self, job):
         if job.face is None or job.frame is None:
             job.lms = None
             return
 
-        crop_image, detail = self._crop_image(job.frame, job.face)
+        box, crop_image, detail = self._crop_image(job.frame, job.face)
         crop_image = (crop_image - 127.0) / 127.0
         crop_image = np.float32([np.transpose(crop_image, (2, 0, 1))])
 
@@ -83,6 +83,8 @@ class LandmarkDetector(Worker):
         lms = lms[0:136].reshape((-1, 2))
         lms[:, 0] = lms[:, 0] * detail[1] + detail[3]
         lms[:, 1] = lms[:, 1] * detail[0] + detail[2]
+
+        job.lms_box = box
 
         if self.tracking:
             try:
