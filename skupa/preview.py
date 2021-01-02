@@ -84,7 +84,7 @@ class Preview(Worker):
             cv2.rectangle(job.frame, (w // 2,      h), (w // 2 + 50, h - le), WHITE, -1)
 
         if self.mouth and getattr(job, 'mouth', None) is not None:
-            labels = ['A', 'E', 'I', 'O', 'U']
+            labels = ['A', 'E', 'I', 'O', 'U', '-']
 
             for i, vowel in enumerate(job.mouth):
                 cv2.putText(job.frame, labels[i],
