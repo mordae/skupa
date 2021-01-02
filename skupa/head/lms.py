@@ -46,6 +46,9 @@ class HeadPoseEstimator(Worker):
         self.correction = Rotation.from_euler('xyz', self.rpy).inv()
 
     async def process(self, job):
+        if job.id < 15:
+            self.pipeline.reset('rpy')
+
         if job.lms is None or job.frame is None:
             job.rpy = None
             return
