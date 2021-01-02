@@ -6,7 +6,7 @@ import numpy as np
 import onnxruntime as ort
 
 from os.path import join, dirname, exists
-from scipy.signal import blackman, welch
+from scipy.signal import welch
 
 from skupa.pipe import Worker
 from skupa.util import defer
@@ -99,7 +99,6 @@ class AudioMouthTracker(Worker):
                 sofar += needed
                 self.adata.insert(0, chunk[needed:])
 
-        window = blackman(len(frame))
         self.volume = 20. * np.log10(np.max(np.abs(frame)) / 32768)
 
         freqs, densities = welch(frame, job.frame_rate, nperseg=len(frame))
@@ -109,22 +108,20 @@ class AudioMouthTracker(Worker):
         densities = 20. * np.log10(densities)
         densities = np.nan_to_num(densities)
 
-        if True:
-            # Decay weights over time.
-            self.vowels = np.around(self.vowels * VOWEL_DECAY_RATE, 4)
+        # Decay weights over time.
+        self.vowels = np.around(self.vowels * VOWEL_DECAY_RATE, 4)
 
-            if True:
-                # Identify the vowel (or silence).
-                inputs = [*densities, *self.prev, self.volume]
-                res = await defer(self.session.run,
-                                  [self.output_name],
-                                  {self.input_name: [inputs]})
+        # Identify the vowel (or silence).
+        inputs = [*densities, *self.prev, self.volume]
+        res = await defer(self.session.run,
+                          [self.output_name],
+                          {self.input_name: [inputs]})
 
-                # This is the vowel model heard the best.
-                vowel = int(res[0])
+        # This is the vowel model heard the best.
+        self.vowels[int(res[0])] = 1
 
-            # Smooth out densities over time.
-            self.prev = self.prev * .5 + densities * .5
+        # Smooth out densities over time.
+        self.prev = self.prev * .5 + densities * .5
 
         # Make vowels attack non-instantly.
         self.average = self.average * (1. - VOWEL_ATTACK_RATE) \
