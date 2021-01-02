@@ -23,10 +23,10 @@ CUTOFF = 100
 LABELS = ['A', 'E', 'I', 'O', 'U', '-']
 
 # How quickly the mouth changes shape to incorporate target vowels.
-VOWEL_ATTACK_RATE = .9
+VOWEL_ATTACK_RATE = 1.
 
 # How quickly do the vowels decay.
-VOWEL_DECAY_RATE = .8
+VOWEL_DECAY_RATE = .9
 
 
 class AudioMouthTracker(Worker):
@@ -64,6 +64,9 @@ class AudioMouthTracker(Worker):
         # Most recent volume.
         self.volume = 0.
 
+        # The volume before that.
+        self.prev_volume = 0.
+
     async def _read_frames(self):
         while True:
             frame = await defer(self.stream.read, SAMPLE_SIZE)
@@ -99,6 +102,7 @@ class AudioMouthTracker(Worker):
                 sofar += needed
                 self.adata.insert(0, chunk[needed:])
 
+        self.prev_volume = self.volume
         self.volume = 20. * np.log10(np.max(np.abs(frame)) / 32768)
 
         freqs, densities = welch(frame, job.frame_rate, nperseg=len(frame))
@@ -108,9 +112,6 @@ class AudioMouthTracker(Worker):
         densities = 20. * np.log10(densities)
         densities = np.nan_to_num(densities)
 
-        # Decay weights over time.
-        self.vowels = np.around(self.vowels * VOWEL_DECAY_RATE, 4)
-
         # Identify the vowel (or silence).
         inputs = [*densities, *self.prev, self.volume]
         res = await defer(self.session.run,
@@ -118,17 +119,27 @@ class AudioMouthTracker(Worker):
                           {self.input_name: [inputs]})
 
         # This is the vowel model heard the best.
-        self.vowels[int(res[0])] = 1
+        vowel = int(res[0])
+        saved = self.vowels[vowel]
+
+        if vowel == 5:
+            self.vowels = np.zeros(len(self.vowels))
+        else:
+            self.vowels *= VOWEL_DECAY_RATE
+            self.vowels[vowel] = saved
+
+        if self.volume > self.prev_volume + 1:
+            diff = self.volume - self.prev_volume
+            self.vowels[vowel] = np.interp(diff, (0, 6), (0, VOWEL_ATTACK_RATE))
+        else:
+            diff = self.prev_volume - self.volume
+            self.vowels *= np.interp(diff, (0, 6), (1., VOWEL_DECAY_RATE))
+
+        self.average = (self.average + self.vowels) / 2.
+        job.mouth = self.average
 
         # Smooth out densities over time.
         self.prev = self.prev * .5 + densities * .5
-
-        # Make vowels attack non-instantly.
-        self.average = self.average * (1. - VOWEL_ATTACK_RATE) \
-                     + self.vowels  *       VOWEL_ATTACK_RATE
-
-        # Present the output.
-        job.mouth = self.average[:5]
 
         # Also include some misc information.
         job.audio_volume = self.volume
