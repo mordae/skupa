@@ -30,7 +30,7 @@ class ScriptSink(Worker):
 
         if self.rate is None:
             self.rate = job.frame_rate
-            self.fp.write('# Skupa Script\n')
+            self.fp.write('# VTuber Script\n')
             json.dump({'version': 1, 'rate': self.rate}, self.fp)
             self.fp.write('\n')
             self.fp.flush()
