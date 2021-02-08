@@ -29,7 +29,7 @@ class PlaybackFeed(Worker):
     def __init__(self, path):
         self.path = path
 
-    async def start(self):
+    async def prepare(self):
         self.pipeline = Gst.ElementFactory.make('playbin3')
 
         if '://' in self.path:
@@ -64,6 +64,10 @@ class PlaybackFeed(Worker):
         self.videosink = self.pipeline.get_property('video-sink').get_by_name('video')
         self.audiosink = self.pipeline.get_property('audio-sink').get_by_name('audio')
 
+        self.pipeline.set_state(Gst.State.PAUSED)
+
+
+    async def start(self):
         self.pipeline.set_state(Gst.State.PLAYING)
 
 

@@ -28,7 +28,7 @@ class LandmarkDetector(Worker):
     def __init__(self, tracking):
         self.tracking = tracking
 
-    async def start(self):
+    async def prepare(self):
         self.predictor = dlib.shape_predictor(MODEL_PATH)
         if self.tracking:
             self.tracker = Tracker()

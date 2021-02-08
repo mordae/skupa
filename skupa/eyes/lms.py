@@ -18,7 +18,7 @@ class EyesTracker(Worker):
     def __init__(self, raw):
         self.raw = raw
 
-    async def start(self):
+    async def prepare(self):
         # Extreme open and closed eye measurements
         self.eyemin = np.float32([99, 99])
         self.eyemax = np.float32([00, 00])

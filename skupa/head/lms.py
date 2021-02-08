@@ -32,7 +32,7 @@ class HeadPoseEstimator(Worker):
     def __init__(self):
         self.correction = Rotation.from_euler('xyz', [0, 0, 0])
 
-    async def start(self):
+    async def prepare(self):
         # In radians for easier averaging.
         self.rpy = np.zeros(3)
 

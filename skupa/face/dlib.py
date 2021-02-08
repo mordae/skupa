@@ -25,7 +25,7 @@ class FaceDetector(Worker):
     requires = ['frame']
     provides = ['face']
 
-    async def start(self):
+    async def prepare(self):
         self.detector = dlib.get_frontal_face_detector()
 
     async def process(self, job):

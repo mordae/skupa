@@ -19,7 +19,7 @@ class ScriptSink(Worker):
         self.path = path
         self.rate = None
 
-    async def start(self):
+    async def prepare(self):
         self.fp = open(self.path, 'w')
 
     async def process(self, job):

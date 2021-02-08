@@ -26,7 +26,7 @@ class LiveFeed(Worker):
     def __init__(self):
         pass
 
-    async def start(self):
+    async def prepare(self):
         self.pipeline = Gst.parse_launch('''
             autovideosrc
             ! queue
@@ -46,6 +46,9 @@ class LiveFeed(Worker):
         self.videosink = self.pipeline.get_by_name('video')
         self.audiosink = self.pipeline.get_by_name('audio')
 
+        self.pipeline.set_state(Gst.State.PAUSED)
+
+    async def start(self):
         self.pipeline.set_state(Gst.State.PLAYING)
 
 

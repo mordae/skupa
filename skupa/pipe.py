@@ -37,6 +37,9 @@ class Pipeline:
         self.workers = order
 
         for worker in self.workers:
+            await worker.prepare()
+
+        for worker in self.workers:
             await worker.start()
 
 
@@ -84,6 +87,9 @@ class Worker:
         self.pipeline = pipeline
 
     def reset(self, hint=None):
+        pass
+
+    async def prepare(self):
         pass
 
     async def start(self):

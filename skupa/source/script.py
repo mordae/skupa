@@ -31,28 +31,12 @@ class ScriptSource(Worker):
         self.offset = offset
 
 
-    def start_audio(self):
-        self.pipeline = Gst.ElementFactory.make('playbin3')
-
-        if '://' in self.path:
-            self.pipeline.set_property('uri', quote(self.audio))
-        else:
-            quri = quote('file://' + abspath(self.audio), ':/')
-            self.pipeline.set_property('uri', quri)
-            self.pipeline.set_property('av-offset', self.offset)
-
-        self.pipeline.set_property('video-sink',
-            Gst.parse_bin_from_description('fakesink', True))
-
-        self.pipeline.set_state(Gst.State.PLAYING)
-
-
-    async def start(self):
+    async def prepare(self):
         self.frames = []
         self.rate = None
 
         if self.audio is not None:
-            self.start_audio()
+            self._prepare_audio()
 
         with open(self.path, 'r') as fp:
             for line in fp.readlines():
@@ -84,6 +68,27 @@ class ScriptSource(Worker):
                     self.frames.append(frame)
 
             assert self.rate is not None, 'No framerate specified'
+
+
+    def _prepare_audio(self):
+        self.pipeline = Gst.ElementFactory.make('playbin3')
+
+        if '://' in self.path:
+            self.pipeline.set_property('uri', quote(self.audio))
+        else:
+            quri = quote('file://' + abspath(self.audio), ':/')
+            self.pipeline.set_property('uri', quri)
+            self.pipeline.set_property('av-offset', self.offset)
+
+        self.pipeline.set_property('video-sink',
+            Gst.parse_bin_from_description('fakesink', True))
+
+        self.pipeline.set_state(Gst.State.PAUSED)
+
+
+    def start(self):
+        if self.audio is not None:
+            self.pipeline.set_state(Gst.State.PLAYING)
 
 
     async def process(self, job):

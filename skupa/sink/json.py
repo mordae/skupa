@@ -19,7 +19,7 @@ class JSONSink(Worker):
         self.port  = port
         self.index = index
 
-    async def start(self):
+    async def prepare(self):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
     def _send(self, route, items):

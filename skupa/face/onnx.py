@@ -76,7 +76,7 @@ class FaceDetector(Worker):
         self.slim = slim
 
 
-    async def start(self):
+    async def prepare(self):
         opts = ort.SessionOptions()
         opts.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
         opts.log_severity_level = 3

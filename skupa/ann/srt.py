@@ -21,7 +21,7 @@ class AnnotateFromSRT(Worker):
     def __init__(self, path):
         self.path = path
 
-    async def start(self):
+    async def prepare(self):
         with open(self.path, 'r') as fp:
             self.srt = list(srt.parse(fp.read(), False))
 
