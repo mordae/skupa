@@ -15,7 +15,7 @@ PREVIEW_HEIGHT = 480
 FONT  = cv2.FONT_HERSHEY_SIMPLEX
 
 WHITE = (255, 255, 255)
-BLUE  = (255,   0,   0)
+BLUE  = (255,  32,  32)
 GREEN = (  0, 255,   0)
 RED   = (  0,   0, 255)
 BLACK = (  0,   0,   0)
@@ -39,7 +39,7 @@ class Preview(Worker):
 
         if getattr(job, 'frame_rate', None) is not None:
             cv2.putText(job.frame, '%3.1f fps' % job.frame_rate, (w - 60, 10),
-                        FONT, 0.4, BLACK)
+                        FONT, 0.4, BLUE)
 
         now = time.time()
 
@@ -47,7 +47,7 @@ class Preview(Worker):
             self.latency = now - job.ts
 
         cv2.putText(job.frame, '%3i ms' % (self.latency * 1000),
-                    (w - 60, 25), FONT, 0.4, BLACK)
+                    (w - 60, 25), FONT, 0.4, BLUE)
 
         if self.face and getattr(job, 'face', None) is not None:
             cv2.rectangle(job.frame,
@@ -71,15 +71,15 @@ class Preview(Worker):
         if self.rpy and getattr(job, 'rpy', None) is not None:
             rpy = job.rpy
             cv2.putText(job.frame, 'R: %6.2f' % rpy[0], (5, 10),
-                        FONT, 0.4, BLACK)
+                        FONT, 0.4, BLUE)
             cv2.putText(job.frame, 'P: %6.2f' % rpy[1], (5, 20),
-                        FONT, 0.4, BLACK)
+                        FONT, 0.4, BLUE)
             cv2.putText(job.frame, 'Y: %6.2f' % rpy[2], (5, 30),
-                        FONT, 0.4, BLACK)
+                        FONT, 0.4, BLUE)
 
         if self.eyes and getattr(job, 'eyes', None) is not None:
             re, le = np.int32(job.eyes * 50)
-            cv2.rectangle(job.frame, (w // 2 - 50, h), (w // 2 + 50, h - 50), BLACK, -1)
+            cv2.rectangle(job.frame, (w // 2 - 50, h), (w // 2 + 50, h - 50), BLUE, -1)
             cv2.rectangle(job.frame, (w // 2 - 50, h), (w // 2,      h - re), WHITE, -1)
             cv2.rectangle(job.frame, (w // 2,      h), (w // 2 + 50, h - le), WHITE, -1)
 
@@ -88,11 +88,11 @@ class Preview(Worker):
 
             for i, vowel in enumerate(job.mouth):
                 cv2.putText(job.frame, labels[i],
-                            (30 + 20 * i, h - 20), FONT, vowel, BLACK)
+                            (30 + 20 * i, h - 20), FONT, vowel, BLUE)
 
             if getattr(job, 'audio_volume', None) is not None:
                 cv2.putText(job.frame, '%5.2f dB' % job.audio_volume,
-                            (20, h - 45), FONT, 0.4, BLACK)
+                            (20, h - 45), FONT, 0.4, BLUE)
 
         cv2.imshow('Skupa Preview', job.frame)
         key = cv2.waitKey(1)

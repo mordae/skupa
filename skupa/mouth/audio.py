@@ -22,11 +22,14 @@ RATE   = 44100
 CUTOFF = 100
 LABELS = ['A', 'E', 'I', 'O', 'U', '-']
 
+# How quickly does the mouth follow the sound.
+VOWEL_MERGE_RATE = 0.5
+
 # How quickly the mouth changes shape to incorporate target vowels.
-VOWEL_ATTACK_RATE = 1.
+VOWEL_ATTACK_RATE = 1.9
 
 # How quickly do the vowels decay.
-VOWEL_DECAY_RATE = .9
+VOWEL_DECAY_RATE = .4
 
 
 class AudioMouthTracker(Worker):
@@ -51,9 +54,6 @@ class AudioMouthTracker(Worker):
 
         # Individual audio buffers.
         self.adata = []
-
-        # Current vowel weights.
-        self.vowels  = np.zeros(len(LABELS))
 
         # Averaged vowel weights to smoothen mouth movement.
         self.average = np.zeros(len(LABELS))
@@ -120,22 +120,11 @@ class AudioMouthTracker(Worker):
 
         # This is the vowel model heard the best.
         vowel = int(res[0])
-        saved = self.vowels[vowel]
 
-        if vowel == 5:
-            self.vowels = np.zeros(len(self.vowels))
-        else:
-            self.vowels *= VOWEL_DECAY_RATE
-            self.vowels[vowel] = saved
+        vowels = self.average * 0.
+        vowels[vowel] = 1.0
 
-        if self.volume > self.prev_volume + 1:
-            diff = self.volume - self.prev_volume
-            self.vowels[vowel] = np.interp(diff, (0, 6), (0, VOWEL_ATTACK_RATE))
-        else:
-            diff = self.prev_volume - self.volume
-            self.vowels *= np.interp(diff, (0, 6), (1., VOWEL_DECAY_RATE))
-
-        self.average = (self.average + self.vowels) / 2.
+        self.average = (VOWEL_MERGE_RATE * vowels + self.average) / (VOWEL_MERGE_RATE + 1.0)
         job.mouth = self.average
 
         # Smooth out densities over time.
