@@ -26,8 +26,9 @@ __all__ = ['PlaybackFeed']
 class PlaybackFeed(Worker):
     provides = ['frame', 'audio']
 
-    def __init__(self, path):
+    def __init__(self, path, video_rate=0):
         self.path = path
+        self.video_rate = video_rate
 
     async def prepare(self):
         self.pipeline = Gst.ElementFactory.make('playbin3')
@@ -38,11 +39,17 @@ class PlaybackFeed(Worker):
             quri = quote('file://' + abspath(self.path), ':/')
             self.pipeline.set_property('uri', quri)
 
+        video_opts = ['video/x-raw', 'format=BGR']
+
+        if self.video_rate:
+            video_opts.append(f'framerate={self.video_rate}/1')
+
         self.pipeline.set_property('video-sink',
-            Gst.parse_bin_from_description('''
+            Gst.parse_bin_from_description(f'''
                 queue
+                ! videorate
                 ! videoconvert
-                ! video/x-raw, format=BGR
+                ! {','.join(video_opts)}
                 ! videoconvert
                 ! appsink name=video max-buffers=60
             ''', True))

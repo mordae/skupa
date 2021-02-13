@@ -23,15 +23,21 @@ __all__ = ['LiveFeed']
 class LiveFeed(Worker):
     provides = ['frame', 'audio']
 
-    def __init__(self):
-        pass
+    def __init__(self, video_rate=0):
+        self.video_rate = video_rate
 
     async def prepare(self):
-        self.pipeline = Gst.parse_launch('''
+        video_opts = ['video/x-raw', 'format=BGR']
+
+        if self.video_rate:
+            video_opts.append(f'framerate={self.video_rate}/1')
+
+        self.pipeline = Gst.parse_launch(f'''
             autovideosrc
             ! queue
+            ! videorate
             ! videoconvert
-            ! video/x-raw, format=BGR
+            ! {','.join(video_opts)}
             ! videoconvert
             ! appsink name=video max-buffers=60
 

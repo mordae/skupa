@@ -11,16 +11,18 @@ def main(**kw):
 
 
 @main.command('live', help='GStreamer-based live audio/video input')
-def live():
+@click.option('-r', '--video-rate', help='Video frame rate', default=0)
+def live(video_rate):
     from skupa.source.live import LiveFeed
-    return LiveFeed()
+    return LiveFeed(video_rate)
 
 
 @main.command('playback', help='GStreamer-based audio/video playback')
 @click.option('-f', '--path', help='File path', required=True)
-def playback(path):
+@click.option('-r', '--video-rate', help='Video frame rate', default=0)
+def playback(path, video_rate):
     from skupa.source.playback import PlaybackFeed
-    return PlaybackFeed(path)
+    return PlaybackFeed(path, video_rate)
 
 
 @main.command('script', help='Replay script without any A/V')
