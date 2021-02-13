@@ -26,12 +26,8 @@ setup(**{
         'numpy         >= 1.17',
         'onnxruntime   >= 1.4',
         'opencv-python >= 4.2',
-        'oscpy         >= 0.5',
-        'PyAudio       >= 0.2',
-        'pyserial      >= 3.4',
         'scipy         >= 1.4',
         'PyGObject     >= 3.36',
-        'srt           >= 3.4',
     ],
     'zip_safe': False,
 })
