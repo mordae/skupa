@@ -27,7 +27,7 @@ class LiveFeed(Worker):
         self.video_rate = video_rate
 
     async def prepare(self):
-        video_opts = ['video/x-raw', 'format=BGR']
+        video_opts = ['video/x-raw', 'format=BGR', 'width=640', 'height=480']
 
         if self.video_rate:
             video_opts.append(f'framerate={self.video_rate}/1')
